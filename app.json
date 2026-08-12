@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Honya",
+    "slug": "Honya",
+    "version": "1.0.0",
+    "scheme": "honya",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#000000"
+    },
+    "android": {
+      "package": "com.example.honya",
+      "edgeToEdgeEnabled": true
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.example.honya"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-splash-screen",
+      "expo-sqlite"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "55bfce84-ffe0-483c-806e-ca82bd9ce44e"
+      }
+    }
+  }
+}
