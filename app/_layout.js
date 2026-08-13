@@ -25,14 +25,12 @@ export default function RootLayout() {
     hydrate().catch((e) => console.warn('hydrate failed', e));
   }, [hydrate]);
 
-  // Keep the in-memory language in sync with the persisted preference and
-  // apply the correct text direction (RTL for Arabic).
-  useEffect(() => {
-    if (lang) {
-      setLanguage(lang);
-      applyDirection();
-    }
-  }, [lang]);
+  // Keep the in-memory language in sync with the persisted pref and mirror it
+  // to the native I18nManager before the first layout commits.
+  if (ready && lang && getLanguage() !== lang) {
+    setLanguage(lang);
+    applyDirection();
+  }
 
   useEffect(() => {
     if (ready) {
@@ -41,7 +39,13 @@ export default function RootLayout() {
   }, [ready]);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.background, ...(isRTL() ? { writingDirection: 'rtl' } : {}) }}>
+    <GestureHandlerRootView
+      style={{
+        flex: 1,
+        backgroundColor: theme.background,
+        direction: isRTL() ? 'rtl' : 'ltr',
+      }}
+    >
       <SafeAreaProvider>
         <StatusBar style={isDark ? 'light' : 'dark'} />
         {!ready ? (

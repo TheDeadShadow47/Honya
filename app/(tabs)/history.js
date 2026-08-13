@@ -7,6 +7,7 @@ import { useAppTheme } from '../../hooks/useAppTheme';
 import { useI18n } from '../../hooks/useI18n';
 import HistoryRow from '../../components/HistoryRow';
 import { encodeNavParam } from '../../lib/navIds';
+import { setPendingReader } from '../../lib/readerContext';
 import { Button, EmptyState, Field, IconButton, ListHeading, ScreenHeader } from '../../components/MD3';
 import { groupByDay } from '../../lib/time';
 
@@ -54,7 +55,15 @@ export default function HistoryScreen() {
   }, [refreshHistory]);
 
   const openChapter = useCallback(
-    (item) => router.push(`/reader/${encodeNavParam(item.id)}`),
+    (item) => {
+      setPendingReader({
+        id: item.id,
+        name: item.name,
+        novelId: item.novelId,
+        novelTitle: item.novelTitle,
+      });
+      router.push(`/reader/${encodeNavParam(item.id)}`);
+    },
     [router],
   );
 

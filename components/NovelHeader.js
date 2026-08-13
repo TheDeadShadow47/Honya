@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../hooks/useAppTheme';
@@ -7,14 +7,18 @@ import { useI18n } from '../hooks/useI18n';
 import { alpha, isThemeDark, RADIUS, TOUCH } from '../theme/theme';
 import Ripple from './Ripple';
 
-function Action({ icon, label, active, onPress }) {
+function Action({ icon, label, active, refreshing, onPress }) {
   const theme = useAppTheme();
   const color = active ? theme.primary : theme.textMuted;
   return (
     <View style={styles.actionWrap}>
-      <Ripple onPress={onPress} accessibilityLabel={label}>
+      <Ripple onPress={refreshing ? undefined : onPress} accessibilityLabel={label}>
         <View style={styles.action}>
-          <Ionicons name={icon} size={20} color={color} />
+          {refreshing ? (
+            <ActivityIndicator size={18} color={color} />
+          ) : (
+            <Ionicons name={icon} size={20} color={color} />
+          )}
           <Text numberOfLines={1} style={{ color, fontSize: 11.5, marginTop: 5, fontWeight: '600' }}>
             {label}
           </Text>
@@ -41,6 +45,7 @@ function NovelHeader({
   onToggleLibrary,
   onMigrate,
   onRefresh,
+  refreshing,
   resumeChapter,
   resumeIsContinue,
   onResume,
@@ -118,7 +123,7 @@ function NovelHeader({
           onPress={onToggleLibrary}
         />
         <Action icon="git-compare-outline" label={t('novel.migrate')} onPress={onMigrate} />
-        <Action icon="refresh-outline" label={t('novel.refresh')} onPress={onRefresh} />
+        <Action icon="refresh-outline" label={t('novel.refresh')} onPress={onRefresh} refreshing={refreshing} />
       </View>
 
       {novel.summary ? (

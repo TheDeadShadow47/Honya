@@ -3,8 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as db from '../db/database';
 import { fetchRepository, fetchPluginCode } from '../lib/repository';
 import { loadPlugin, pluginApi, unloadPlugin } from '../lib/pluginEngine';
-import { stripHtml } from '../lib/clean';
+import { sanitizeChapter } from '../lib/clean';
 import { loadChapterPrefs } from '../lib/chapterPrefs';
+import { setLanguage, applyDirection } from '../lib/i18n';
 
 const DOWNLOAD_CONCURRENCY = 3;
 
@@ -33,7 +34,7 @@ export const useStore = create((set, get) => ({
   library: [],
   updates: [],
   history: [],
-  downloadStates: {}, // { [chapterId]: 'downloading' | 'failed' }
+  downloadStates: {},
 
   /* ---------- bootstrap ---------- */
   hydrate: async () => {
@@ -52,16 +53,17 @@ export const useStore = create((set, get) => ({
     plugins.forEach((p) => {
       installedExtensions[p.id] = p;
     });
-    // Warm the chapter-prefs cache before `ready` lifts, so the novel screen's
-    // first render can read saved filters/sort/display synchronously.
+
     await loadChapterPrefs();
+    setLanguage(prefs.lang);
+    applyDirection();
     set({ prefs, userRepositories: repos, installedExtensions, ready: true });
     await get().refreshLibrary();
     await get().refreshUpdates();
     await get().refreshHistory();
   },
 
-  /* ---------- preferences ---------- */
+  /* preferences */
   setPref: async (key, value) => {
     const prefs = { ...get().prefs, [key]: value };
     set({ prefs });
@@ -72,7 +74,7 @@ export const useStore = create((set, get) => ({
     await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(DEFAULT_PREFS));
   },
 
-  /* ---------- repositories ---------- */
+  /* repositories  */
   addRepository: async (url) => {
     const clean = url.trim();
     if (!/^https?:\/\//i.test(clean)) throw new Error('Enter a full http(s) URL');
@@ -109,7 +111,7 @@ export const useStore = create((set, get) => ({
     set({ repoCatalog: catalog, repoLoading: false, repoError: errors.join('\n') || null });
   },
 
-  /* ---------- extensions ---------- */
+  /* extensions  */
   installExtension: async (meta) => {
     const code = await fetchPluginCode(meta.codeUrl);
     const record = { ...meta, code };
@@ -125,7 +127,7 @@ export const useStore = create((set, get) => ({
     set({ installedExtensions: next });
   },
 
-  /* ---------- global search ---------- */
+  /* global search  */
   globalSearch: async (query) => {
     const q = query.trim();
     const extensions = Object.values(get().installedExtensions);
@@ -158,7 +160,7 @@ export const useStore = create((set, get) => ({
     return { results, errors };
   },
 
-  /* ---------- downloads ---------- */
+  /* downloads */
   downloadChapter: async (chapter) => {
     const id = chapter?.id;
     if (!id) return;
@@ -170,7 +172,7 @@ export const useStore = create((set, get) => ({
       if (!record) throw new Error('The source extension for this novel is not installed');
       const instance = loadPlugin(record);
       const raw = await pluginApi.chapter(instance, chapter.path);
-      const clean = stripHtml(raw);
+      const clean = sanitizeChapter(raw, { title: chapter.name });
       if (!clean) throw new Error('The source returned an empty chapter');
       await db.saveChapterText(id, clean);
       const next = { ...get().downloadStates };
@@ -209,11 +211,11 @@ export const useStore = create((set, get) => ({
     set({ downloadStates: next });
   },
 
-  /* ---------- library ---------- */
+  /* library  */
   refreshLibrary: async () => set({ library: await db.getLibrary() }),
   refreshUpdates: async () => set({ updates: await db.getRecentUpdates() }),
 
-  /* ---------- history ----------
+  /* history 
    * Reads straight from the chapters table (the existing source of truth for
    * reading state). No separate history storage exists.
    */

@@ -11,6 +11,7 @@ import Ripple from '../../components/Ripple';
 import Cover from '../../components/Cover';
 import { groupByDay, relativeTime } from '../../lib/time';
 import { encodeNavParam } from '../../lib/navIds';
+import { setPendingReader } from '../../lib/readerContext';
 import { RADIUS } from '../../theme/theme';
 
 export default function UpdatesScreen() {
@@ -42,7 +43,17 @@ export default function UpdatesScreen() {
       if (item.type === 'header') return <ListHeading label={item.label} />;
       const update = item.row;
       return (
-        <Ripple onPress={() => router.push(`/reader/${encodeNavParam(update.id)}`)}>
+        <Ripple
+          onPress={() => {
+            setPendingReader({
+              id: update.id,
+              name: update.name,
+              novelId: update.novelId,
+              novelTitle: update.novelTitle,
+            });
+            router.push(`/reader/${encodeNavParam(update.id)}`);
+          }}
+        >
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 }}>
             <Cover uri={update.novelCover} title={update.novelTitle} width={50} height={72} radius={RADIUS.md} />
             <View style={{ flex: 1, minWidth: 0, marginLeft: 14 }}>

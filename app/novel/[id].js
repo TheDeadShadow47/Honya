@@ -7,8 +7,9 @@ import { useAppTheme } from '../../hooks/useAppTheme';
 import { useI18n } from '../../hooks/useI18n';
 import { loadPlugin, pluginApi } from '../../lib/pluginEngine';
 import { decodeNavParam, encodeNavParam } from '../../lib/navIds';
+import { setPendingReader } from '../../lib/readerContext';
 import * as db from '../../db/database';
-import ChapterRow from '../../components/ChapterRow';
+import ChapterRow, { CHAPTER_ROW_HEIGHT } from '../../components/ChapterRow';
 import ChapterManageSheet from '../../components/ChapterManageSheet';
 import { getCachedChapterPrefs, loadChapterPrefs, saveChapterPrefs } from '../../lib/chapterPrefs';
 import NovelHeader from '../../components/NovelHeader';
@@ -79,10 +80,20 @@ export default function NovelDetailsScreen() {
   // toolbar shows aggregate progress ("Downloading N chapters…") while it runs.
   const [bulkDownloading, setBulkDownloading] = useState(0);
 
+  // Refresh spinner for the header action; a ref guard prevents a second
+  // request while one is already in flight (rapid taps / long refreshes).
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshingRef = useRef(false);
+
   // Set to true when this screen instance is unmounted, so async work that
   // resolves afterwards (DB reads, a slow network fetch) does not touch state
   // or clog the DB queue with writes the user no longer wants.
   const cancelledRef = useRef(false);
+
+  // Live mirror of the loaded novel for callbacks that must stay stable (the
+  // memoised ChapterRow renderer) but still read the current title.
+  const novelRef = useRef(null);
+  novelRef.current = novel;
 
   const reload = useCallback(async () => {
     setNovel(await db.getNovel(novelId));
@@ -295,7 +306,15 @@ export default function NovelDetailsScreen() {
   const openChapter = useCallback(
     (chapter) => {
       if (selectingRef.current) toggleSelect(chapter.id);
-      else router.push(`/reader/${encodeNavParam(chapter.id)}`);
+      else {
+        setPendingReader({
+          id: chapter.id,
+          name: chapter.name,
+          novelId: chapter.novelId,
+          novelTitle: novelRef.current?.title,
+        });
+        router.push(`/reader/${encodeNavParam(chapter.id)}`);
+      }
     },
     [router, toggleSelect],
   );
@@ -413,7 +432,17 @@ export default function NovelDetailsScreen() {
     () => router.push(`/novel/migrate?id=${encodeNavParam(novelId)}`),
     [router, novelId],
   );
-  const onRefreshNovel = useCallback(() => fetchRemote(novel), [fetchRemote, novel]);
+  const onRefreshNovel = useCallback(async () => {
+    if (refreshingRef.current || !novel) return;
+    refreshingRef.current = true;
+    setRefreshing(true);
+    try {
+      await fetchRemote(novel);
+    } finally {
+      refreshingRef.current = false;
+      setRefreshing(false);
+    }
+  }, [fetchRemote, novel]);
   const onToggleLibrary = useCallback(async () => {
     await toggleLibrary(novel);
     await reload();
@@ -428,7 +457,15 @@ export default function NovelDetailsScreen() {
     setSortKey('numberAsc');
   }, []);
   const onResume = useCallback(() => {
-    if (resumeChapter) router.push(`/reader/${encodeNavParam(resumeChapter.id)}`);
+    if (resumeChapter) {
+      setPendingReader({
+        id: resumeChapter.id,
+        name: resumeChapter.name,
+        novelId: resumeChapter.novelId,
+        novelTitle: novelRef.current?.title,
+      });
+      router.push(`/reader/${encodeNavParam(resumeChapter.id)}`);
+    }
   }, [router, resumeChapter]);
 
   const renderItem = useCallback(
@@ -463,6 +500,24 @@ export default function NovelDetailsScreen() {
 
   const keyExtractor = useCallback((item) => item.id, []);
 
+  // VirtualizedList estimates cells that are not yet mounted from getItemLayout
+  // and compares those offsets against the raw scroll offset, which already
+  // includes the (variable-height) ListHeaderComponent. The item offsets here
+  // must therefore include the header's measured height too, or the render
+  // window would be misplaced while scrolling quickly through a huge list.
+  const headerHeightRef = useRef(0);
+  const onHeaderLayout = useCallback((e) => {
+    headerHeightRef.current = e.nativeEvent.layout.height;
+  }, []);
+  const getItemLayout = useCallback(
+    (_, index) => ({
+      length: CHAPTER_ROW_HEIGHT,
+      offset: headerHeightRef.current + CHAPTER_ROW_HEIGHT * index,
+      index,
+    }),
+    [],
+  );
+
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center' }}>
@@ -486,32 +541,35 @@ export default function NovelDetailsScreen() {
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         extraData={selectedIds}
-        removeClippedSubviews
+        getItemLayout={getItemLayout}
         initialNumToRender={12}
-        maxToRenderPerBatch={10}
+        maxToRenderPerBatch={21}
         updateCellsBatchingPeriod={50}
-        windowSize={9}
+        windowSize={21}
         contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
         ListHeaderComponent={
-          <NovelHeader
-            novel={novel}
-            sourceName={sourceName}
-            topInset={insets.top}
-            expanded={expanded}
-            onToggleExpanded={onToggleExpanded}
-            onBack={onBack}
-            onToggleLibrary={onToggleLibrary}
-            onMigrate={onMigrate}
-            onRefresh={onRefreshNovel}
-            resumeChapter={resumeChapter}
-            resumeIsContinue={resumeIsContinue}
-            onResume={onResume}
-            totalChapters={chapters.length}
-            shownChapters={visibleChapters.length}
-            filtered={filtersActive}
-            manageActive={manageActive}
-            onOpenManage={openManage}
-          />
+          <View onLayout={onHeaderLayout}>
+            <NovelHeader
+              novel={novel}
+              sourceName={sourceName}
+              topInset={insets.top}
+              expanded={expanded}
+              onToggleExpanded={onToggleExpanded}
+              onBack={onBack}
+              onToggleLibrary={onToggleLibrary}
+              onMigrate={onMigrate}
+              onRefresh={onRefreshNovel}
+              refreshing={refreshing}
+              resumeChapter={resumeChapter}
+              resumeIsContinue={resumeIsContinue}
+              onResume={onResume}
+              totalChapters={chapters.length}
+              shownChapters={visibleChapters.length}
+              filtered={filtersActive}
+              manageActive={manageActive}
+              onOpenManage={openManage}
+            />
+          </View>
         }
         ListEmptyComponent={
           <Text style={{ color: theme.textMuted, textAlign: 'center', padding: 24 }}>
