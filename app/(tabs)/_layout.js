@@ -1,9 +1,11 @@
+import React from 'react';
 import { Text, View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { RADIUS } from '../../theme/theme';
+import { useI18n } from '../../hooks/useI18n';
 
 /**
  * Material 3 style navigation bar. The active pill is a plain View that swaps
@@ -45,6 +47,7 @@ function TabItem({ routeName, focused, theme }) {
 export default function TabsLayout() {
   const theme = useAppTheme();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
 
   return (
     <Tabs
@@ -71,11 +74,11 @@ export default function TabsLayout() {
         ),
       })}
     >
-      <Tabs.Screen name="index" options={{ title: 'Library' }} />
-      <Tabs.Screen name="updates" options={{ title: 'Updates' }} />
-      <Tabs.Screen name="history" options={{ title: 'History' }} />
-      <Tabs.Screen name="catalogs" options={{ title: 'Catalogs' }} />
-      <Tabs.Screen name="more" options={{ title: 'More' }} />
+      <Tabs.Screen name="index" options={{ title: t('nav.library') }} />
+      <Tabs.Screen name="updates" options={{ title: t('nav.updates') }} />
+      <Tabs.Screen name="history" options={{ title: t('nav.history') }} />
+      <Tabs.Screen name="catalogs" options={{ title: t('nav.catalogs') }} />
+      <Tabs.Screen name="more" options={{ title: t('nav.more') }} />
     </Tabs>
   );
 }

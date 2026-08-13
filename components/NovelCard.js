@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { encodeNavParam } from '../lib/navIds';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { alpha, RADIUS } from '../theme/theme';
 import Ripple from './Ripple';
@@ -15,7 +16,7 @@ const NovelCard = memo(function NovelCard({ novel, width }) {
 
   return (
     <View style={{ width, borderRadius: RADIUS.lg, overflow: 'hidden' }}>
-      <Ripple onPress={() => router.push(`/novel/${encodeURIComponent(novel.id)}`)}>
+      <Ripple onPress={() => router.push(`/novel/${encodeNavParam(novel.id)}`)}>
         <View>
           <View style={styles.coverWrap}>
             <Cover uri={novel.cover} title={novel.title} radius={RADIUS.lg} style={styles.cover} />

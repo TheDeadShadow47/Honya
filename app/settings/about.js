@@ -1,10 +1,12 @@
-import { Linking, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useStore } from '../../store/useStore';
-import { Button, SectionLabel, Surface } from '../../components/MD3';
+import { useI18n } from '../../hooks/useI18n';
+import { SectionLabel, Surface } from '../../components/MD3';
 
 export default function AboutScreen() {
   const theme = useAppTheme();
+  const { t } = useI18n();
   const { userRepositories, installedExtensions } = useStore();
 
   return (
@@ -12,34 +14,27 @@ export default function AboutScreen() {
       <Surface level={1} style={{ padding: 18, marginBottom: 18 }}>
         <Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Honya</Text>
         <Text style={{ color: theme.textMuted, marginTop: 8, fontSize: 13.5, lineHeight: 20 }}>
-          A light novel reader with Material Design 3 styling. The app ships with no built-in sources: every source comes
-          from a repository you add yourself, and plugin code is downloaded only when you tap Install.
+          {t('settingsAbout.description')}
         </Text>
       </Surface>
 
-      <SectionLabel>Status</SectionLabel>
+      <SectionLabel>{t('settingsAbout.status').toUpperCase()}</SectionLabel>
       <Surface level={1} style={{ padding: 16, marginBottom: 18 }}>
-        <Text style={{ color: theme.text, fontSize: 14 }}>Version 1.0.0</Text>
+        <Text style={{ color: theme.text, fontSize: 14 }}>
+          {t('settingsAbout.version')} 1.1.0
+        </Text>
         <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: 6 }}>
-          {userRepositories.length} repositories · {Object.keys(installedExtensions).length} extensions installed
+          {userRepositories.length} {t('settingsAbout.repositories')} ·{' '}
+          {Object.keys(installedExtensions).length} {t('settingsAbout.extensionsInstalled')}
         </Text>
       </Surface>
 
-      <SectionLabel>Notice</SectionLabel>
+      <SectionLabel>{t('settingsAbout.notice').toUpperCase()}</SectionLabel>
       <Surface level={1} style={{ padding: 16, marginBottom: 18 }}>
         <Text style={{ color: theme.textMuted, fontSize: 13, lineHeight: 20 }}>
-          Extensions are third-party code. Only add repositories you trust — plugin scripts run inside the app with
-          network access.
+          {t('settingsAbout.noticeText')}
         </Text>
-        <View style={{ marginTop: 14 }}>
-          <Button
-            label="Expo documentation"
-            variant="tonal"
-            onPress={() => Linking.openURL('https://docs.expo.dev')}
-          />
-        </View>
       </Surface>
-
     </ScrollView>
   );
 }

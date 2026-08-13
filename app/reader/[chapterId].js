@@ -5,10 +5,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
+import { useI18n } from '../../hooks/useI18n';
 import * as db from '../../db/database';
 import { loadPlugin, pluginApi } from '../../lib/pluginEngine';
 import { decodeEntities, stripHtml } from '../../lib/clean';
+import { decodeNavParam, encodeNavParam } from '../../lib/navIds';
 import { RADIUS, READER_BACKGROUNDS } from '../../theme/theme';
+import { isArabicText } from '../../lib/i18n';
 import Ripple from '../../components/Ripple';
 
 const OFFLINE_RE = /Network request failed|Failed to fetch|fetch failed|Network is unreachable|Unable to resolve host|ENETUNREACH|ECONNRESET|ECONNREFUSED|timeout|timed out/i;
@@ -43,15 +46,15 @@ function ChapterDivider({ name, fg }) {
 }
 
 /** Inline load failure for an appended chapter (offline / network error). */
-function InlineError({ offline, error, fg, bg, onRetry }) {
+function InlineError({ offline, error, fg, bg, onRetry, t }) {
   return (
     <View style={{ marginVertical: 28 }}>
       <Text style={{ color: fg, fontSize: 15, fontWeight: '700' }}>
-        {offline ? 'Not available offline' : 'Could not load this chapter'}
+        {offline ? t('reader.notAvailableOffline') : t('reader.couldNotLoad')}
       </Text>
       <Text style={{ color: fg, opacity: 0.7, marginTop: 8, lineHeight: 20 }}>
         {offline
-          ? 'This chapter is not downloaded. Connect to the internet and retry, or download it from the chapter list.'
+          ? t('reader.offlineHint')
           : error}
       </Text>
       <View style={{ marginTop: 14, borderRadius: RADIUS.pill, overflow: 'hidden', alignSelf: 'flex-start' }}>
@@ -67,7 +70,7 @@ function InlineError({ offline, error, fg, bg, onRetry }) {
             }}
           >
             <Ionicons name="refresh" size={16} color={bg} />
-            <Text style={{ color: bg, fontWeight: '700', marginLeft: 8 }}>Retry</Text>
+            <Text style={{ color: bg, fontWeight: '700', marginLeft: 8 }}>{t('reader.retry')}</Text>
           </View>
         </Ripple>
       </View>
@@ -77,9 +80,10 @@ function InlineError({ offline, error, fg, bg, onRetry }) {
 
 export default function ReaderScreen() {
   const { chapterId } = useLocalSearchParams();
-  const id = decodeURIComponent(String(chapterId));
+  const id = decodeNavParam(chapterId);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const contentPadTop = insets.top + 28;
 
   const prefs = useStore((s) => s.prefs);
@@ -172,9 +176,13 @@ export default function ReaderScreen() {
         return;
       }
       if (appendedIdsRef.current.has(next.id)) return; // already in the list
-      let seg = { id: next.id, name: next.name, ch: next, text: '', status: 'ready', error: null, offline: false };
+      let seg = { id: next.id, name: next.name, ch: next, text: '', rtl: false, status: 'ready', error: null, offline: false };
       try {
-        seg.text = await fetchChapterText(next);
+        const text = await fetchChapterText(next);
+        // Each appended chapter gets its own direction, computed once from its
+        // own text — a continuous-reading session can freely mix English and
+        // Arabic chapters without any of them inheriting a sibling's direction.
+        seg = { ...seg, text, rtl: isArabicText(text) };
       } catch (e) {
         const msg = String(e?.message ?? '');
         seg = { ...seg, status: 'failed', error: msg, offline: OFFLINE_RE.test(msg) };
@@ -216,13 +224,29 @@ export default function ReaderScreen() {
       const ch = await db.getChapter(id);
       if (!ch) throw new Error('Chapter not found locally');
       setChapter(ch);
-      const nv = await db.getNovel(ch.novelId);
-      setNovel(nv);
-      novelRef.current = nv;
       installedRef.current = installedExtensions;
 
-      const text = await fetchChapterText(ch);
-      const seg = { id: ch.id, name: ch.name, ch, text, status: 'ready', error: null, offline: false };
+      // The novel record is only needed for the header (title/back-bar) and to
+      // resolve the plugin for a *non*-downloaded chapter. A downloaded chapter's
+      // text can be decoded straight away without waiting on that DB read, so the
+      // two run in parallel instead of one blocking the other.
+      const novelPromise = db.getNovel(ch.novelId).then((nv) => {
+        novelRef.current = nv;
+        setNovel(nv);
+        return nv;
+      });
+
+      let text;
+      if (ch.downloadedText) {
+        // Nothing here needs the novel record — decode and render right away.
+        text = decodeEntities(ch.downloadedText);
+        novelPromise.catch(() => {}); // still resolves in the background for the header
+      } else {
+        await novelPromise; // remote fetch needs the plugin record
+        text = await fetchChapterText(ch);
+      }
+
+      const seg = { id: ch.id, name: ch.name, ch, text, rtl: isArabicText(text), status: 'ready', error: null, offline: false };
       segmentsRef.current = [seg];
       setSegments([seg]);
       restoredRef.current = false;
@@ -403,7 +427,7 @@ export default function ReaderScreen() {
     if (!target) return;
     setSettingsOpen(false);
     setUiVisible(false);
-    router.replace(`/reader/${encodeURIComponent(target.id)}`);
+    router.replace(`/reader/${encodeNavParam(target.id)}`);
   };
 
   const activeSeg = segments[activeIndex] ?? null;
@@ -416,9 +440,10 @@ export default function ReaderScreen() {
     async (chapterId) => {
       const row = await db.getChapter(chapterId);
       if (!row) return;
+      const decoded = decodeEntities(row.downloadedText);
       const next = segmentsRef.current.map((s) =>
         s.id === chapterId
-          ? { ...s, ch: row, text: decodeEntities(row.downloadedText), status: 'ready', error: null, offline: false }
+          ? { ...s, ch: row, text: decoded, rtl: isArabicText(decoded), status: 'ready', error: null, offline: false }
           : s,
       );
       segmentsRef.current = next;
@@ -435,17 +460,17 @@ export default function ReaderScreen() {
       await downloadChapter(seg.ch);
       await refreshSegment(seg.id);
     } catch (e) {
-      Alert.alert('Download failed', e.message);
+      Alert.alert(t('reader.downloadFailed'), e.message);
     }
   };
 
   const onRemoveDownload = () => {
     const seg = activeSeg;
     if (!seg) return;
-    Alert.alert('Remove download?', 'This chapter will no longer be available offline.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('reader.removeDownload'), t('reader.removeDownloadSubtitle'), [
+      { text: t('more.resetCancel'), style: 'cancel' },
       {
-        text: 'Remove',
+        text: t('reader.remove'),
         style: 'destructive',
         onPress: async () => {
           await removeDownload(seg.id);
@@ -464,7 +489,9 @@ export default function ReaderScreen() {
       setSegments(segmentsRef.current);
       try {
         const text = await fetchChapterText(seg.ch);
-        const next = segmentsRef.current.map((s) => (s.id === segId ? { ...s, text, status: 'ready', error: null, offline: false } : s));
+        const next = segmentsRef.current.map((s) =>
+          s.id === segId ? { ...s, text, rtl: isArabicText(text), status: 'ready', error: null, offline: false } : s,
+        );
         segmentsRef.current = next;
         setSegments(next);
         db.touchChapterRead(segId).catch(() => {});
@@ -493,7 +520,7 @@ export default function ReaderScreen() {
       <View style={{ flex: 1 }} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
         <ScrollView
           ref={scrollRef}
-          style={{ flex: 1 }}
+          style={{ flex: 1, direction: 'ltr' }}
           onLayout={(e) => {
             viewportRef.current = e.nativeEvent.layout.height;
           }}
@@ -514,31 +541,14 @@ export default function ReaderScreen() {
             <ActivityIndicator color={palette.fg} style={{ marginTop: 60 }} />
           ) : error ? (
             <View style={{ marginTop: 60, alignItems: 'flex-start' }}>
-              <Text style={{ color: palette.fg, fontSize: 16, fontWeight: '700' }}>
-                {offline ? 'Not available offline' : 'Could not load this chapter'}
-              </Text>
-              <Text style={{ color: palette.fg, opacity: 0.7, marginTop: 8, lineHeight: 20 }}>
-                {offline
-                  ? 'This chapter is not downloaded. Connect to the internet and open it, or download it from the chapter list to read it anywhere.'
-                  : error}
-              </Text>
-              <View style={{ marginTop: 18, borderRadius: RADIUS.pill, overflow: 'hidden' }}>
-                <Ripple onPress={load}>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      paddingHorizontal: 22,
-                      height: 44,
-                      backgroundColor: palette.fg,
-                      borderRadius: RADIUS.pill,
-                    }}
-                  >
-                    <Ionicons name="refresh" size={17} color={palette.bg} />
-                    <Text style={{ color: palette.bg, fontWeight: '700', marginLeft: 8 }}>Try again</Text>
-                  </View>
-                </Ripple>
-              </View>
+              <InlineError
+                offline={offline}
+                error={error}
+                fg={palette.fg}
+                bg={palette.bg}
+                onRetry={load}
+                t={t}
+              />
             </View>
           ) : (
             segments.map((seg, idx) => (
@@ -557,6 +567,7 @@ export default function ReaderScreen() {
                     fg={palette.fg}
                     bg={palette.bg}
                     onRetry={() => retrySegment(seg.id)}
+                    t={t}
                   />
                 ) : (
                   <Text
@@ -564,6 +575,14 @@ export default function ReaderScreen() {
                       color: palette.fg,
                       fontSize: prefs.fontSize,
                       lineHeight: prefs.fontSize * prefs.lineHeight,
+                      // Each segment carries its own direction, computed from its own
+                      // text — independent of the app's UI language/RTL setting.
+                      // `textAlign` has to be set explicitly alongside `writingDirection`:
+                      // left as 'auto' it resolves against the app's global RTL state
+                      // (from I18nManager), not the text's own script, which is exactly
+                      // what made English chapters render right-aligned under an Arabic UI.
+                      writingDirection: seg.rtl ? 'rtl' : 'ltr',
+                      textAlign: seg.rtl ? 'right' : 'left',
                     }}
                   >
                     {seg.text}
@@ -575,7 +594,6 @@ export default function ReaderScreen() {
         </ScrollView>
       </View>
 
-      {/* Top bar */}
       <Animated.View
         pointerEvents={uiVisible ? 'auto' : 'none'}
         style={{
@@ -625,7 +643,6 @@ export default function ReaderScreen() {
         </Ripple>
       </Animated.View>
 
-      {/* Bottom bar */}
       <Animated.View
         pointerEvents={uiVisible ? 'auto' : 'none'}
         style={{
@@ -660,7 +677,6 @@ export default function ReaderScreen() {
         </Ripple>
       </Animated.View>
 
-      {/* Settings bottom sheet */}
       <Animated.View
         pointerEvents={settingsOpen ? 'auto' : 'none'}
         style={{
@@ -682,7 +698,7 @@ export default function ReaderScreen() {
         <View style={{ alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: palette.fg + '55' }} />
 
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
-          <Text style={{ color: palette.fg, fontWeight: '800', fontSize: 15 }}>Reader settings</Text>
+          <Text style={{ color: palette.fg, fontWeight: '800', fontSize: 15 }}>{t('reader.settings')}</Text>
           <View style={{ borderRadius: RADIUS.pill, overflow: 'hidden' }}>
             <Ripple onPress={() => setSettingsOpen(false)} borderless>
               <View style={{ padding: 8 }}>
@@ -692,7 +708,7 @@ export default function ReaderScreen() {
           </View>
         </View>
 
-        <Text style={{ color: palette.fg, fontWeight: '800', fontSize: 13, marginTop: 16 }}>Background</Text>
+        <Text style={{ color: palette.fg, fontWeight: '800', fontSize: 13, marginTop: 16 }}>{t('reader.background')}</Text>
         <View style={{ flexDirection: 'row', gap: 12, marginTop: 10 }}>
           {READER_BACKGROUNDS.map((b) => (
             <Ripple key={b.key} onPress={() => setPref('readerBackground', b.key)}>
@@ -715,7 +731,7 @@ export default function ReaderScreen() {
         </View>
 
         <Text style={{ color: palette.fg, fontWeight: '800', fontSize: 13, marginTop: 18 }}>
-          Font size · {prefs.fontSize}
+          {t('reader.fontSize')} · {prefs.fontSize}
         </Text>
         <Slider
           minimumValue={12}
@@ -729,7 +745,7 @@ export default function ReaderScreen() {
         />
 
         <Text style={{ color: palette.fg, fontWeight: '800', fontSize: 13, marginTop: 8 }}>
-          Line height · {prefs.lineHeight.toFixed(1)}
+          {t('reader.lineHeight')} · {prefs.lineHeight.toFixed(1)}
         </Text>
         <Slider
           minimumValue={1.2}
@@ -743,7 +759,7 @@ export default function ReaderScreen() {
         />
 
         <Text style={{ color: palette.fg, fontWeight: '800', fontSize: 13, marginTop: 8 }}>
-          Side padding · {prefs.horizontalPadding}
+          {t('reader.sidePadding')} · {prefs.horizontalPadding}
         </Text>
         <Slider
           minimumValue={8}

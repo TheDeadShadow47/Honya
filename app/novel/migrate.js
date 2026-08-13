@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { migrateNovel } from '../../lib/migrate';
+import { decodeNavParam } from '../../lib/navIds';
 import * as db from '../../db/database';
 import { Button, EmptyState, SearchBar } from '../../components/MD3';
 import Ripple from '../../components/Ripple';
@@ -14,7 +15,7 @@ const DEBOUNCE_MS = 450;
 
 export default function MigrateScreen() {
   const { id } = useLocalSearchParams();
-  const sourceId = decodeURIComponent(String(id));
+  const sourceId = decodeNavParam(id);
   const theme = useAppTheme();
   const router = useRouter();
 

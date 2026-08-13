@@ -5,16 +5,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
 import { useAppTheme } from '../../hooks/useAppTheme';
+import { useI18n } from '../../hooks/useI18n';
 import { EmptyState, ListHeading, ScreenHeader } from '../../components/MD3';
 import Ripple from '../../components/Ripple';
 import Cover from '../../components/Cover';
 import { groupByDay, relativeTime } from '../../lib/time';
+import { encodeNavParam } from '../../lib/navIds';
 import { RADIUS } from '../../theme/theme';
 
 export default function UpdatesScreen() {
   const theme = useAppTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const updates = useStore((s) => s.updates);
   const refreshUpdates = useStore((s) => s.refreshUpdates);
   const [refreshing, setRefreshing] = useState(false);
@@ -39,7 +42,7 @@ export default function UpdatesScreen() {
       if (item.type === 'header') return <ListHeading label={item.label} />;
       const update = item.row;
       return (
-        <Ripple onPress={() => router.push(`/reader/${encodeURIComponent(update.id)}`)}>
+        <Ripple onPress={() => router.push(`/reader/${encodeNavParam(update.id)}`)}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 }}>
             <Cover uri={update.novelCover} title={update.novelTitle} width={50} height={72} radius={RADIUS.md} />
             <View style={{ flex: 1, minWidth: 0, marginLeft: 14 }}>
@@ -72,11 +75,15 @@ export default function UpdatesScreen() {
     [router, theme],
   );
 
+  const subtitle = updates.length
+    ? t('updates.count', { count: updates.length, plural: updates.length === 1 ? '' : 's', unread })
+    : t('updates.empty');
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.background, paddingTop: insets.top }}>
       <ScreenHeader
-        title="Updates"
-        subtitle={updates.length ? `${updates.length} recent chapters · ${unread} unread` : 'New chapters land here'}
+        title={t('nav.updates')}
+        subtitle={subtitle}
       />
       <FlatList
         data={rows}
@@ -93,8 +100,8 @@ export default function UpdatesScreen() {
         ListEmptyComponent={
           <EmptyState
             icon="notifications-outline"
-            title="No updates yet"
-            subtitle="Chapters from novels in your library will show up here after you refresh a novel."
+            title={t('updates.empty')}
+            subtitle={t('updates.empty.subtitle')}
           />
         }
       />

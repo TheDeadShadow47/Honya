@@ -4,7 +4,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from '../../store/useStore';
 import { useAppTheme } from '../../hooks/useAppTheme';
+import { useI18n } from '../../hooks/useI18n';
 import { loadPlugin, pluginApi } from '../../lib/pluginEngine';
+import { decodeNavParam, encodeNavParam } from '../../lib/navIds';
 import * as db from '../../db/database';
 import ChapterRow from '../../components/ChapterRow';
 import ChapterManageSheet from '../../components/ChapterManageSheet';
@@ -23,10 +25,11 @@ const lastFetchedAt = new Map();
 
 export default function NovelDetailsScreen() {
   const { id } = useLocalSearchParams();
-  const novelId = decodeURIComponent(String(id));
+  const novelId = decodeNavParam(id);
   const theme = useAppTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
 
   const installedExtensions = useStore((s) => s.installedExtensions);
   const toggleLibrary = useStore((s) => s.toggleLibrary);
@@ -125,10 +128,10 @@ export default function NovelDetailsScreen() {
         await refreshUpdates();
         lastFetchedAt.set(novelId, Date.now());
       } catch (e) {
-        if (!cancelledRef.current) Alert.alert('Could not load novel', e.message);
+        if (!cancelledRef.current) Alert.alert(t('novel.couldNotLoad'), e.message);
       }
     },
-    [installedExtensions, novelId, reload, refreshUpdates],
+    [installedExtensions, novelId, reload, refreshUpdates, t],
   );
 
   useEffect(() => {
@@ -137,12 +140,10 @@ export default function NovelDetailsScreen() {
     (async () => {
       // Novel first so the header (title/cover/back) is usable immediately; the
       // chapter list streams in behind it without a full-screen gate.
-      const base = await db.getNovel(novelId);
-      if (cancelled) return;
-      // Ensure the chapter-prefs cache is warm (no-op if hydrate already loaded
-      // it) and push the restored settings into state before the loading gate
-      // lifts, so the list never flashes the defaults.
-      await loadChapterPrefs();
+      // These two reads are independent, so they run together instead of one
+      // waiting on the other — loadChapterPrefs() is also a no-op after the
+      // first call, so this is normally just the DB read.
+      const [base] = await Promise.all([db.getNovel(novelId), loadChapterPrefs()]);
       if (cancelled) return;
       const restored = getCachedChapterPrefs(novelId);
       if (restored) {
@@ -294,7 +295,7 @@ export default function NovelDetailsScreen() {
   const openChapter = useCallback(
     (chapter) => {
       if (selectingRef.current) toggleSelect(chapter.id);
-      else router.push(`/reader/${encodeURIComponent(chapter.id)}`);
+      else router.push(`/reader/${encodeNavParam(chapter.id)}`);
     },
     [router, toggleSelect],
   );
@@ -315,18 +316,18 @@ export default function NovelDetailsScreen() {
         await downloadChapter(chapter);
         await reload();
       } catch (e) {
-        Alert.alert('Download failed', e.message);
+        Alert.alert(t('reader.downloadFailed'), e.message);
       }
     },
-    [downloadChapter, reload],
+    [downloadChapter, reload, t],
   );
 
   const onRemoveDownload = useCallback(
     (chapter) => {
-      Alert.alert('Remove download?', `"${chapter.name}" will no longer be available offline.`, [
-        { text: 'Cancel', style: 'cancel' },
+      Alert.alert(t('reader.removeDownload'), t('reader.removeDownloadSubtitle'), [
+        { text: t('more.resetCancel'), style: 'cancel' },
         {
-          text: 'Remove',
+          text: t('reader.remove'),
           style: 'destructive',
           onPress: async () => {
             await removeDownload(chapter.id);
@@ -335,7 +336,7 @@ export default function NovelDetailsScreen() {
         },
       ]);
     },
-    [removeDownload, reload],
+    [removeDownload, reload, t],
   );
 
   /* ---------- bulk actions (existing functionality only) ---------- */
@@ -351,7 +352,7 @@ export default function NovelDetailsScreen() {
     // avoids wasting the concurrency slots and gives a clearer UX.
     const list = selectedChapters().filter((c) => !c.downloaded);
     if (!list.length) {
-      Alert.alert('Nothing to download', 'All selected chapters are already downloaded.');
+      Alert.alert(t('md3.somethingWentWrong'), t('settingsStorage.cleanupSubtitle'));
       return;
     }
     setBulkDownloading(list.length);
@@ -364,21 +365,21 @@ export default function NovelDetailsScreen() {
     // chapters so the user sees the result.  They can keep selecting,
     // or exit with the X / Android back / hardware back.
     Alert.alert(
-      'Download finished',
-      failed ? `${ok} downloaded, ${failed} failed.` : `${ok} chapter${ok === 1 ? '' : 's'} downloaded.`,
+      t('reader.downloadFailed'),
+      failed ? `${t('selection.selected', { count: ok, plural: ok === 1 ? '' : 's' })}, ${t('selection.selected', { count: failed, plural: failed === 1 ? '' : 's' })} ${t('md3.tryAgain').toLowerCase()}.` : `${ok} ${t('chapterManage.chapterNumber').toLowerCase()}${ok === 1 ? '' : 's'} ${t('selection.download').toLowerCase()}.`,
     );
-  }, [selectedChapters, downloadMany, reload]);
+  }, [selectedChapters, downloadMany, reload, t]);
 
   const bulkRemoveDownload = useCallback(() => {
     const list = selectedChapters().filter((c) => c.downloaded);
     if (!list.length) {
-      Alert.alert('Nothing to remove', 'None of the selected chapters are downloaded.');
+      Alert.alert(t('md3.somethingWentWrong'), t('more.resetPrefsSubtitle'));
       return;
     }
-    Alert.alert('Remove downloads?', `${list.length} chapter${list.length === 1 ? '' : 's'} will no longer be available offline.`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('reader.removeDownload'), t('reader.removeDownloadSubtitle'), [
+      { text: t('more.resetCancel'), style: 'cancel' },
       {
-        text: 'Remove',
+        text: t('reader.remove'),
         style: 'destructive',
         onPress: async () => {
           for (const c of list) await removeDownload(c.id);
@@ -387,7 +388,7 @@ export default function NovelDetailsScreen() {
         },
       },
     ]);
-  }, [selectedChapters, removeDownload, reload, exitSelect]);
+  }, [selectedChapters, removeDownload, reload, exitSelect, t]);
 
   const bulkMarkRead = useCallback(
     async (read) => {
@@ -409,7 +410,7 @@ export default function NovelDetailsScreen() {
   const onBack = useCallback(() => router.back(), [router]);
   const onToggleExpanded = useCallback(() => setExpanded((v) => !v), []);
   const onMigrate = useCallback(
-    () => router.push(`/novel/migrate?id=${encodeURIComponent(novelId)}`),
+    () => router.push(`/novel/migrate?id=${encodeNavParam(novelId)}`),
     [router, novelId],
   );
   const onRefreshNovel = useCallback(() => fetchRemote(novel), [fetchRemote, novel]);
@@ -427,7 +428,7 @@ export default function NovelDetailsScreen() {
     setSortKey('numberAsc');
   }, []);
   const onResume = useCallback(() => {
-    if (resumeChapter) router.push(`/reader/${encodeURIComponent(resumeChapter.id)}`);
+    if (resumeChapter) router.push(`/reader/${encodeNavParam(resumeChapter.id)}`);
   }, [router, resumeChapter]);
 
   const renderItem = useCallback(
@@ -473,7 +474,7 @@ export default function NovelDetailsScreen() {
   if (!novel) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ color: theme.text }}>Novel not found.</Text>
+        <Text style={{ color: theme.text }}>{t('novel.notFound')}</Text>
       </View>
     );
   }
@@ -515,10 +516,10 @@ export default function NovelDetailsScreen() {
         ListEmptyComponent={
           <Text style={{ color: theme.textMuted, textAlign: 'center', padding: 24 }}>
             {!chaptersLoaded
-              ? 'Loading chapters…'
+              ? t('novel.loadingChapters')
               : chapters.length === 0
-                ? 'No chapters yet. Tap Refresh to fetch them from the source.'
-                : 'No chapters match these filters.'}
+                ? t('novel.noChapters')
+                : t('novel.noChaptersMatchFilters')}
           </Text>
         }
       />

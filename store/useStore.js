@@ -13,6 +13,7 @@ const REPOS_KEY = '@shosetsu/repos';
 
 export const DEFAULT_PREFS = {
   theme: 'honya',
+  lang: 'en',
   readerBackground: 'black',
   fontSize: 18,
   lineHeight: 1.7,

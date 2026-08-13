@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { loadPlugin, pluginApi } from '../../lib/pluginEngine';
+import { decodeNavParam } from '../../lib/navIds';
 import { upsertNovel } from '../../db/database';
 import { Button, Chip, EmptyState, Field } from '../../components/MD3';
 import NovelCard from '../../components/NovelCard';
@@ -14,7 +15,7 @@ const PADDING = 16;
 
 export default function BrowsePluginScreen() {
   const { pluginId } = useLocalSearchParams();
-  const id = decodeURIComponent(String(pluginId));
+  const id = decodeNavParam(pluginId);
   const theme = useAppTheme();
   const router = useRouter();
   const navigation = useNavigation();

@@ -5,7 +5,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
 import { useAppTheme } from '../../hooks/useAppTheme';
+import { useI18n } from '../../hooks/useI18n';
 import { upsertNovel } from '../../db/database';
+import { encodeNavParam } from '../../lib/navIds';
 import { Button, EmptyState, ScreenHeader, SearchBar, SectionLabel, SkeletonList } from '../../components/MD3';
 import Ripple from '../../components/Ripple';
 import { RADIUS } from '../../theme/theme';
@@ -94,6 +96,7 @@ export default function CatalogsScreen() {
   const theme = useAppTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { t } = useI18n();
   const installedExtensions = useStore((s) => s.installedExtensions);
   const globalSearch = useStore((s) => s.globalSearch);
 
@@ -164,7 +167,7 @@ export default function CatalogsScreen() {
       try {
         await upsertNovel({ ...item, inLibrary: false });
       } catch {}
-      router.push(`/novel/${encodeURIComponent(item.id)}`);
+      router.push(`/novel/${encodeNavParam(item.id)}`);
     },
     [router],
   );
@@ -176,16 +179,16 @@ export default function CatalogsScreen() {
     body = (
       <EmptyState
         icon="apps-outline"
-        title="No sources installed"
-        subtitle="Install a source from More to search for novels across every installed source."
-        action={<Button label="Manage sources" onPress={() => router.push('/settings/extensions')} />}
+        title={t('catalogs.empty')}
+        subtitle={t('catalogs.empty.subtitle')}
+        action={<Button label={t('catalogs.manageSources')} onPress={() => router.push('/settings/extensions')} />}
       />
     );
   } else if (isSearching) {
     body = (
       <View style={{ flex: 1 }}>
         <Text style={{ color: theme.textMuted, fontSize: 12.5, paddingHorizontal: 16, paddingBottom: 10 }}>
-          Searching {sources.length} {sources.length === 1 ? 'source' : 'sources'}…
+          {t('catalogs.searching', { count: sources.length, plural: sources.length === 1 ? '' : 's' })}
         </Text>
         <SkeletonList count={6} />
       </View>
@@ -201,16 +204,16 @@ export default function CatalogsScreen() {
         ListHeaderComponent={
           errorCount > 0 ? (
             <Text style={{ color: theme.textMuted, fontSize: 12, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 }}>
-              {errorCount} {errorCount === 1 ? 'source' : 'sources'} did not respond. Showing results from the rest.
+              {t('catalogs.sourceErrors', { count: errorCount, plural: errorCount === 1 ? '' : 's' })}
             </Text>
           ) : null
         }
         ListEmptyComponent={
           <EmptyState
             icon="search-outline"
-            title="No results found"
-            subtitle={`Nothing matched "${activeQuery}". Try a different title or fewer words.`}
-            action={<Button label="Search again" variant="tonal" onPress={() => runSearch(query)} />}
+            title={t('catalogs.noResults')}
+            subtitle={t('catalogs.noResults.subtitle', { query: activeQuery })}
+            action={<Button label={t('catalogs.searchAgain')} variant="tonal" onPress={() => runSearch(query)} />}
           />
         }
       />
@@ -224,14 +227,14 @@ export default function CatalogsScreen() {
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           <View style={{ marginBottom: 12 }}>
-            <SectionLabel>Browse sources</SectionLabel>
+            <SectionLabel>{t('catalogs.browseSources')}</SectionLabel>
             <Text style={{ color: theme.textMuted, fontSize: 13, lineHeight: 19 }}>
-              Search above to look across every installed source, or open a source to browse its catalog.
+              {t('catalogs.browseHint')}
             </Text>
           </View>
         }
         renderItem={({ item }) => (
-          <SourceRow ext={item} onPress={() => router.push(`/browse/${encodeURIComponent(item.id)}`)} />
+          <SourceRow ext={item} onPress={() => router.push(`/browse/${encodeNavParam(item.id)}`)} />
         )}
       />
     );
@@ -240,11 +243,11 @@ export default function CatalogsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.background, paddingTop: insets.top }}>
       <ScreenHeader
-        title="Catalogs"
+        title={t('nav.catalogs')}
         subtitle={
           sources.length
-            ? `${sources.length} source${sources.length === 1 ? '' : 's'} installed`
-            : 'No sources installed yet'
+            ? t('catalogs.sourcesInstalled', { count: sources.length, plural: sources.length === 1 ? '' : 's' })
+            : t('catalogs.noSources')
         }
       />
       <View style={{ paddingHorizontal: 16, paddingTop: 2, paddingBottom: 10 }}>
@@ -253,7 +256,7 @@ export default function CatalogsScreen() {
           onChangeText={onChangeText}
           onClear={clearSearch}
           onSubmit={() => runSearch(query)}
-          placeholder={sources.length ? 'Search all sources' : 'Search'}
+          placeholder={sources.length ? t('catalogs.searchPlaceholder') : t('md3.search')}
           autoFocus={false}
         />
       </View>

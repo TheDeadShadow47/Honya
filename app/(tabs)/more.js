@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
 import { useAppTheme } from '../../hooks/useAppTheme';
+import { useI18n } from '../../hooks/useI18n';
 import { SectionLabel, Surface } from '../../components/MD3';
 import Ripple from '../../components/Ripple';
 import { RADIUS, THEMES } from '../../theme/theme';
@@ -42,6 +43,7 @@ export default function MoreScreen() {
   const theme = useAppTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const { prefs, setPref, userRepositories, installedExtensions, library } = useStore();
 
   const cycleColumns = () => setPref('gridColumns', prefs.gridColumns >= 4 ? 2 : prefs.gridColumns + 1);
@@ -51,75 +53,81 @@ export default function MoreScreen() {
       <Surface level={1} style={{ padding: 18, marginBottom: 18 }}>
         <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>Honya</Text>
         <Text style={{ color: theme.textMuted, marginTop: 6, fontSize: 13 }}>
-          {library.length} in library · {Object.keys(installedExtensions).length} extensions · {userRepositories.length}{' '}
-          repositories
+          {t('more.stats', { library: library.length, extensions: Object.keys(installedExtensions).length, repos: userRepositories.length })}
         </Text>
       </Surface>
 
-      <SectionLabel>Appearance</SectionLabel>
+      <SectionLabel>{t('more.appearance').toUpperCase()}</SectionLabel>
       <Group>
         <Row
           icon="color-palette-outline"
-          title="Theme"
-          subtitle={THEMES[prefs.theme]?.name ?? 'Theme'}
+          title={t('more.theme')}
+          subtitle={THEMES[prefs.theme]?.name ?? t('more.theme')}
           onPress={() => router.push('/settings/theme')}
         />
         <Divider />
         <Row
           icon="grid-outline"
-          title="Library grid"
+          title={t('more.grid')}
           subtitle={`${prefs.gridColumns} columns`}
           onPress={cycleColumns}
           right={<Ionicons name="swap-horizontal" size={18} color={theme.textMuted} />}
         />
       </Group>
 
-      <SectionLabel>Extensions & Sources</SectionLabel>
+      <SectionLabel>{t('settingsExtensions.installed').toUpperCase()}</SectionLabel>
       <Group>
         <Row
           icon="apps-outline"
-          title="Extensions"
-          subtitle="Install or manage sources"
+          title={t('more.extensions')}
+          subtitle={t('more.extensionsSubtitle')}
           onPress={() => router.push('/settings/extensions')}
         />
         <Divider />
         <Row
           icon="server-outline"
-          title="Repositories"
-          subtitle="Add or remove plugin sources"
+          title={t('more.repositories')}
+          subtitle={t('more.repositoriesSubtitle')}
           onPress={() => router.push('/settings/repositories')}
         />
       </Group>
 
-      <SectionLabel>Reading</SectionLabel>
+      <SectionLabel>{t('more.reading').toUpperCase()}</SectionLabel>
       <Group>
         <Row
           icon="book-outline"
-          title="Reader settings"
-          subtitle="Font, spacing and background"
+          title={t('more.readerSettings')}
+          subtitle={t('more.readerSubtitle')}
           onPress={() => router.push('/settings/reader')}
+        />
+        <Divider />
+        <Row
+          icon="language-outline"
+          title={t('settingsLanguage.title')}
+          subtitle={t('settingsLanguage.subtitle')}
+          onPress={() => router.push('/settings/language')}
         />
       </Group>
 
-      <SectionLabel>Application</SectionLabel>
+      <SectionLabel>{t('more.application').toUpperCase()}</SectionLabel>
       <Group>
         <Row
           icon="save-outline"
-          title="Storage"
-          subtitle="Downloads and database"
+          title={t('more.storage')}
+          subtitle={t('more.storageSubtitle')}
           onPress={() => router.push('/settings/storage')}
         />
         <Divider />
-        <Row icon="information-circle-outline" title="App info" onPress={() => router.push('/settings/about')} />
+        <Row icon="information-circle-outline" title={t('more.about')} onPress={() => router.push('/settings/about')} />
         <Divider />
         <Row
           icon="refresh-outline"
-          title="Reset preferences"
-          subtitle="Restore default appearance and reader settings"
+          title={t('more.resetPrefs')}
+          subtitle={t('more.resetPrefsSubtitle')}
           onPress={() =>
-            Alert.alert('Reset preferences?', 'Library and extensions are not affected.', [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Reset', style: 'destructive', onPress: () => useStore.getState().resetPrefs() },
+            Alert.alert(t('more.resetConfirm'), t('more.resetConfirmBody'), [
+              { text: t('more.resetCancel'), style: 'cancel' },
+              { text: t('more.resetAction'), style: 'destructive', onPress: () => useStore.getState().resetPrefs() },
             ])
           }
           right={<View style={{ width: 1, borderRadius: RADIUS.sm }} />}

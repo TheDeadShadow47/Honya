@@ -4,7 +4,9 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from '../../store/useStore';
 import { useAppTheme } from '../../hooks/useAppTheme';
+import { useI18n } from '../../hooks/useI18n';
 import HistoryRow from '../../components/HistoryRow';
+import { encodeNavParam } from '../../lib/navIds';
 import { Button, EmptyState, Field, IconButton, ListHeading, ScreenHeader } from '../../components/MD3';
 import { groupByDay } from '../../lib/time';
 
@@ -19,6 +21,7 @@ export default function HistoryScreen() {
   const theme = useAppTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const history = useStore((s) => s.history);
   const refreshHistory = useStore((s) => s.refreshHistory);
   const removeHistoryEntry = useStore((s) => s.removeHistoryEntry);
@@ -51,34 +54,34 @@ export default function HistoryScreen() {
   }, [refreshHistory]);
 
   const openChapter = useCallback(
-    (item) => router.push(`/reader/${encodeURIComponent(item.id)}`),
+    (item) => router.push(`/reader/${encodeNavParam(item.id)}`),
     [router],
   );
 
   const confirmRemove = useCallback(
     (item) => {
-      Alert.alert(item.name ?? 'Chapter', 'Remove this from your history?', [
-        { text: 'Cancel', style: 'cancel' },
+      Alert.alert(t('history.removeConfirm'), '', [
+        { text: t('more.resetCancel'), style: 'cancel' },
         {
-          text: 'Open novel',
-          onPress: () => router.push(`/novel/${encodeURIComponent(item.novelId)}`),
+          text: t('history.removeOpenNovel'),
+          onPress: () => router.push(`/novel/${encodeNavParam(item.novelId)}`),
         },
         {
-          text: 'Remove',
+          text: t('history.remove'),
           style: 'destructive',
           onPress: () => removeHistoryEntry(item.id),
         },
       ]);
     },
-    [removeHistoryEntry, router],
+    [removeHistoryEntry, router, t],
   );
 
   const confirmClear = useCallback(() => {
-    Alert.alert('Clear history?', 'Your reading progress and downloads are kept — only this list is cleared.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Clear', style: 'destructive', onPress: () => clearHistory() },
+    Alert.alert(t('history.clearTitle'), t('history.clearSubtitle'), [
+      { text: t('more.resetCancel'), style: 'cancel' },
+      { text: t('history.clear'), style: 'destructive', onPress: () => clearHistory() },
     ]);
-  }, [clearHistory]);
+  }, [clearHistory, t]);
 
   const toggleSearch = useCallback(() => {
     setSearchOpen((open) => {
@@ -101,23 +104,27 @@ export default function HistoryScreen() {
     [openChapter, confirmRemove],
   );
 
+  const subtitle = history.length
+    ? t('history.count', { count: history.length, plural: history.length === 1 ? '' : 's' })
+    : t('history.hint');
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.background, paddingTop: insets.top }}>
       <ScreenHeader
-        title="History"
-        subtitle={history.length ? `${history.length} recently read chapter${history.length === 1 ? '' : 's'}` : 'Pick up where you left off'}
+        title={t('nav.history')}
+        subtitle={subtitle}
         right={
           <View style={{ flexDirection: 'row' }}>
             <IconButton
               icon={searchOpen ? 'close' : 'search'}
               onPress={toggleSearch}
-              accessibilityLabel="Search history"
+              accessibilityLabel={t('history.searchA11y')}
             />
             <IconButton
               icon="trash-outline"
               onPress={confirmClear}
               disabled={history.length === 0}
-              accessibilityLabel="Clear history"
+              accessibilityLabel={t('history.clearA11y')}
             />
           </View>
         }
@@ -125,7 +132,7 @@ export default function HistoryScreen() {
 
       {searchOpen ? (
         <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
-          <Field value={query} onChangeText={setQuery} placeholder="Search history" autoFocus />
+          <Field value={query} onChangeText={setQuery} placeholder={t('history.searchPlaceholder')} autoFocus />
         </View>
       ) : null}
 
@@ -145,13 +152,13 @@ export default function HistoryScreen() {
         ListEmptyComponent={
           <EmptyState
             icon={history.length ? 'search-outline' : 'time-outline'}
-            title={history.length ? 'No matches' : 'Nothing read yet'}
+            title={history.length ? t('history.noMatches') : t('history.empty')}
             subtitle={
               history.length
-                ? 'No chapter in your history matches that search.'
-                : 'Chapters you open show up here so you can jump straight back into them.'
+                ? t('history.noMatches.subtitle')
+                : t('history.empty.subtitle')
             }
-            action={history.length ? null : <Button label="Go to library" onPress={() => router.push('/(tabs)')} />}
+            action={history.length ? null : <Button label={t('history.goToLibrary')} onPress={() => router.push('/(tabs)')} />}
           />
         }
       />

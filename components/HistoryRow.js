@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../hooks/useAppTheme';
+import { useI18n } from '../hooks/useI18n';
 import { RADIUS } from '../theme/theme';
 import { relativeTime } from '../lib/time';
 import { ProgressBar } from './MD3';
@@ -14,7 +15,9 @@ import Cover from './Cover';
  */
 const HistoryRow = memo(function HistoryRow({ item, onPress, onLongPress }) {
   const theme = useAppTheme();
+  const { t } = useI18n();
   const progress = item.read ? 1 : Math.min(Math.max(item.progress ?? 0, 0), 1);
+  const pct = Math.round(progress * 100);
 
   return (
     <Ripple onPress={onPress} onLongPress={onLongPress}>
@@ -26,7 +29,7 @@ const HistoryRow = memo(function HistoryRow({ item, onPress, onLongPress }) {
             {item.novelTitle}
           </Text>
           <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: 13, marginTop: 3 }}>
-            {item.name ?? `Chapter ${item.number ?? ''}`}
+            {item.name ?? t('historyRow.chapter', { number: item.number })}
           </Text>
 
           <View style={styles.metaRow}>
@@ -35,7 +38,7 @@ const HistoryRow = memo(function HistoryRow({ item, onPress, onLongPress }) {
             </Text>
             <Text style={{ color: theme.textMuted, fontSize: 11.5 }}> · </Text>
             <Text style={{ color: item.read ? theme.textMuted : theme.primary, fontSize: 11.5, fontWeight: '700' }}>
-              {item.read ? 'Finished' : progress > 0.02 ? `${Math.round(progress * 100)}% read` : 'Started'}
+              {item.read ? t('historyRow.finished') : progress > 0.02 ? t('historyRow.readPct', { pct }) : t('historyRow.started')}
             </Text>
             {item.downloaded ? (
               <>

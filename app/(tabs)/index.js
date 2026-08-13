@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from '../../store/useStore';
 import { useAppTheme } from '../../hooks/useAppTheme';
+import { useI18n } from '../../hooks/useI18n';
 import NovelCard from '../../components/NovelCard';
 import { Button, EmptyState, Field, IconButton, ScreenHeader } from '../../components/MD3';
 
@@ -15,6 +16,7 @@ export default function LibraryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const { t } = useI18n();
   const library = useStore((s) => s.library);
   const columns = useStore((s) => s.prefs.gridColumns);
   const setPref = useStore((s) => s.setPref);
@@ -56,28 +58,28 @@ export default function LibraryScreen() {
     });
   }, []);
 
+  const subtitle = library.length
+    ? t('library.withUnread', { count: library.length, plural: library.length === 1 ? '' : 's', unread })
+    : t('library.empty');
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.background, paddingTop: insets.top }}>
       <ScreenHeader
-        title="Library"
-        subtitle={
-          library.length
-            ? `${library.length} novel${library.length === 1 ? '' : 's'}${unread ? ` · ${unread} unread` : ''}`
-            : 'Nothing saved yet'
-        }
+        title={t('nav.library')}
+        subtitle={subtitle}
         right={
           <View style={{ flexDirection: 'row' }}>
             <IconButton
               icon={searchOpen ? 'close' : 'search'}
               color={theme.text}
               onPress={toggleSearch}
-              accessibilityLabel="Search library"
+              accessibilityLabel={t('library.searchA11y')}
             />
             <IconButton
               icon="grid-outline"
               color={theme.text}
               onPress={() => setPref('gridColumns', columns >= 4 ? 2 : columns + 1)}
-              accessibilityLabel="Change grid size"
+              accessibilityLabel={t('library.gridA11y')}
             />
           </View>
         }
@@ -85,7 +87,7 @@ export default function LibraryScreen() {
 
       {searchOpen ? (
         <View style={{ paddingHorizontal: PADDING, paddingBottom: 12 }}>
-          <Field value={query} onChangeText={setQuery} placeholder="Search your library" autoFocus />
+          <Field value={query} onChangeText={setQuery} placeholder={t('library.searchPlaceholder')} autoFocus />
         </View>
       ) : null}
 
@@ -108,14 +110,14 @@ export default function LibraryScreen() {
         ListEmptyComponent={
           <EmptyState
             icon={library.length ? 'search-outline' : 'library-outline'}
-            title={library.length ? 'No matches' : 'Your library is empty'}
+            title={library.length ? t('library.noMatches') : t('library.empty')}
             subtitle={
               library.length
-                ? 'No novel in your library matches that search. Try fewer words.'
-                : 'Novels you add appear here. Find something to read in Catalogs, then tap the heart on a novel.'
+                ? t('library.noMatches.subtitle')
+                : t('library.empty.subtitle')
             }
             action={
-              library.length ? null : <Button label="Find novels" onPress={() => router.push('/(tabs)/catalogs')} />
+              library.length ? null : <Button label={t('library.findNovels')} onPress={() => router.push('/(tabs)/catalogs')} />
             }
           />
         }

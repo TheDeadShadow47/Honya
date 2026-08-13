@@ -2,31 +2,32 @@ import { memo, useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../hooks/useAppTheme';
+import { useI18n } from '../hooks/useI18n';
 import { alpha, RADIUS, TOUCH } from '../theme/theme';
 import Ripple from './Ripple';
 import BottomSheet from './BottomSheet';
 
 const TABS = [
-  { key: 'filter', label: 'Filter' },
-  { key: 'sort', label: 'Sort' },
-  { key: 'display', label: 'Display' },
+  { key: 'filter', label: 'chapterManage.filter' },
+  { key: 'sort', label: 'chapterManage.sort' },
+  { key: 'display', label: 'chapterManage.display' },
 ];
 
 const FILTERS = [
-  { key: 'downloaded', label: 'Downloaded', icon: 'cloud-done-outline' },
-  { key: 'unread', label: 'Unread', icon: 'ellipse-outline' },
+  { key: 'downloaded', label: 'chapterManage.downloaded', icon: 'cloud-done-outline' },
+  { key: 'unread', label: 'chapterManage.unread', icon: 'ellipse-outline' },
 ];
 
 const SORTS = [
-  { key: 'numberAsc', label: 'Chapter number', hint: 'Ascending' },
-  { key: 'numberDesc', label: 'Chapter number', hint: 'Descending' },
-  { key: 'newest', label: 'Release date', hint: 'Newest first' },
-  { key: 'oldest', label: 'Release date', hint: 'Oldest first' },
+  { key: 'numberAsc', label: 'chapterManage.chapterNumber', hint: 'chapterManage.ascending' },
+  { key: 'numberDesc', label: 'chapterManage.chapterNumber', hint: 'chapterManage.descending' },
+  { key: 'newest', label: 'chapterManage.releaseDate', hint: 'chapterManage.newestFirst' },
+  { key: 'oldest', label: 'chapterManage.releaseDate', hint: 'chapterManage.oldestFirst' },
 ];
 
 const DISPLAYS = [
-  { key: 'sourceTitle', label: 'Source name', icon: 'server-outline' },
-  { key: 'chapterNumber', label: 'Chapter number', icon: 'list-outline' },
+  { key: 'sourceTitle', label: 'chapterManage.sourceName', icon: 'server-outline' },
+  { key: 'chapterNumber', label: 'chapterManage.chapterNumber', icon: 'list-outline' },
 ];
 
 const OptionRow = memo(function OptionRow({ label, hint, icon, selected, radio, onPress }) {
@@ -80,18 +81,19 @@ function ChapterManageSheet({
   canReset,
 }) {
   const theme = useAppTheme();
+  const { t } = useI18n();
   const [tab, setTab] = useState('filter');
   const selectTab = useCallback((key) => setTab(key), []);
 
   return (
     <BottomSheet visible={visible} onDismiss={onDismiss}>
       <View style={styles.headerRow}>
-        <Text style={{ color: theme.text, fontSize: 16, fontWeight: '800', flex: 1 }}>Chapters</Text>
+        <Text style={{ color: theme.text, fontSize: 16, fontWeight: '800', flex: 1 }}>{t('chapterManage.chapters')}</Text>
         {canReset ? (
           <View style={{ borderRadius: RADIUS.pill, overflow: 'hidden' }}>
             <Ripple onPress={onReset} borderless>
               <View style={{ paddingHorizontal: 12, paddingVertical: 8 }}>
-                <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>Reset</Text>
+                <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>{t('chapterManage.reset')}</Text>
               </View>
             </Ripple>
           </View>
@@ -100,11 +102,11 @@ function ChapterManageSheet({
 
       {/* Segmented tabs — switching only swaps a tiny option list. */}
       <View style={[styles.segment, { backgroundColor: theme.surface1, borderColor: theme.outline }]}>
-        {TABS.map((t) => {
-          const active = tab === t.key;
+        {TABS.map((tabItem) => {
+          const active = tab === tabItem.key;
           return (
-            <View key={t.key} style={styles.segmentItem}>
-              <Ripple onPress={() => selectTab(t.key)} accessibilityLabel={t.label}>
+            <View key={tabItem.key} style={styles.segmentItem}>
+              <Ripple onPress={() => selectTab(tabItem.key)} accessibilityLabel={tabItem.label}>
                 <View style={[styles.segmentInner, active ? { backgroundColor: theme.primaryContainer } : null]}>
                   <Text
                     style={{
@@ -113,7 +115,7 @@ function ChapterManageSheet({
                       fontSize: 13.5,
                     }}
                   >
-                    {t.label}
+                    {t(tabItem.label) || tabItem.label}
                   </Text>
                 </View>
               </Ripple>
@@ -127,7 +129,7 @@ function ChapterManageSheet({
           ? FILTERS.map((f) => (
               <OptionRow
                 key={f.key}
-                label={f.label}
+                label={t(f.label) || f.label}
                 icon={f.icon}
                 selected={!!filters[f.key]}
                 onPress={() => onFilterChange(f.key, !filters[f.key])}
@@ -137,8 +139,8 @@ function ChapterManageSheet({
             ? SORTS.map((s) => (
                 <OptionRow
                   key={s.key}
-                  label={s.label}
-                  hint={s.hint}
+                  label={t(s.label) || s.label}
+                  hint={t(s.hint) || s.hint}
                   radio
                   selected={sortKey === s.key}
                   onPress={() => onSortChange(s.key)}
@@ -147,7 +149,7 @@ function ChapterManageSheet({
             : DISPLAYS.map((d) => (
                 <OptionRow
                   key={d.key}
-                  label={d.label}
+                  label={t(d.label) || d.label}
                   icon={d.icon}
                   selected={!!display[d.key]}
                   onPress={() => onDisplayChange(d.key, !display[d.key])}

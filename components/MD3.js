@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Modal, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../hooks/useAppTheme';
+import { useI18n } from '../hooks/useI18n';
 import { alpha, RADIUS, TOUCH } from '../theme/theme';
 import Ripple from './Ripple';
 
@@ -13,6 +14,7 @@ export function Surface({ level = 1, style, children }) {
 
 export function Button({ label, icon, onPress, variant = 'filled', style, disabled, loading }) {
   const theme = useAppTheme();
+  const { t } = useI18n();
   const palette = {
     filled: { bg: theme.primary, fg: theme.onPrimary },
     tonal: { bg: theme.secondaryContainer, fg: theme.text },
@@ -28,7 +30,7 @@ export function Button({ label, icon, onPress, variant = 'filled', style, disabl
           ) : (
             <>
               {icon ? <View style={{ marginRight: 8 }}>{icon}</View> : null}
-              <Text style={{ color: palette.fg, fontWeight: '700', fontSize: 14.5 }}>{label}</Text>
+              <Text style={{ color: palette.fg, fontWeight: '700', fontSize: 14.5 }}>{t(label) || label}</Text>
             </>
           )}
         </View>
@@ -118,6 +120,7 @@ export function Field({ value, onChangeText, placeholder, multiline, autoFocus, 
 
 export function SearchBar({ value, onChangeText, onClear, onSubmit, placeholder, autoFocus = true }) {
   const theme = useAppTheme();
+  const { t } = useI18n();
   return (
     <View
       style={{
@@ -136,7 +139,7 @@ export function SearchBar({ value, onChangeText, onClear, onSubmit, placeholder,
       <TextInput
         value={value}
         onChangeText={onChangeText}
-        placeholder={placeholder ?? 'Search'}
+        placeholder={placeholder ? t(placeholder) : 'Search'}
         placeholderTextColor={theme.textMuted}
         autoFocus={autoFocus}
         autoCapitalize="none"
@@ -160,6 +163,7 @@ export function SearchBar({ value, onChangeText, onClear, onSubmit, placeholder,
 
 export function EmptyState({ title, subtitle, action, icon = 'book-outline' }) {
   const theme = useAppTheme();
+  const { t } = useI18n();
   return (
     <View style={styles.empty}>
       <View
@@ -175,10 +179,10 @@ export function EmptyState({ title, subtitle, action, icon = 'book-outline' }) {
       >
         <Ionicons name={icon} size={30} color={theme.primary} />
       </View>
-      <Text style={{ color: theme.text, fontSize: 17, fontWeight: '700', textAlign: 'center' }}>{title}</Text>
+      <Text style={{ color: theme.text, fontSize: 17, fontWeight: '700', textAlign: 'center' }}>{t(title) || title}</Text>
       {subtitle ? (
         <Text style={{ color: theme.textMuted, marginTop: 8, textAlign: 'center', lineHeight: 20, fontSize: 13.5 }}>
-          {subtitle}
+          {t(subtitle) || subtitle}
         </Text>
       ) : null}
       {action ? <View style={{ marginTop: 20 }}>{action}</View> : null}
@@ -390,8 +394,9 @@ export function ScreenHeader({ title, subtitle, right, style }) {
 }
 
 /** Consistent, human readable error presentation. */
-export function ErrorState({ title = 'Something went wrong', message, onRetry, retryLabel = 'Try again' }) {
+export function ErrorState({ title = 'md3.somethingWentWrong', message, onRetry, retryLabel = 'md3.tryAgain' }) {
   const theme = useAppTheme();
+  const { t } = useI18n();
   return (
     <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1, padding: 28 }}>
       <View
@@ -407,13 +412,13 @@ export function ErrorState({ title = 'Something went wrong', message, onRetry, r
       >
         <Ionicons name="alert-circle-outline" size={30} color={theme.error} />
       </View>
-      <Text style={{ color: theme.text, fontSize: 16.5, fontWeight: '800', textAlign: 'center' }}>{title}</Text>
+      <Text style={{ color: theme.text, fontSize: 16.5, fontWeight: '800', textAlign: 'center' }}>{t(title) || title}</Text>
       {message ? (
         <Text style={{ color: theme.textMuted, fontSize: 13.5, lineHeight: 20, textAlign: 'center', marginTop: 8 }}>
           {message}
         </Text>
       ) : null}
-      {onRetry ? <Button label={retryLabel} variant="tonal" onPress={onRetry} style={{ marginTop: 18 }} /> : null}
+      {onRetry ? <Button label={t(retryLabel) || retryLabel} variant="tonal" onPress={onRetry} style={{ marginTop: 18 }} /> : null}
     </View>
   );
 }

@@ -4,12 +4,14 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
 import { useAppTheme } from '../../hooks/useAppTheme';
+import { useI18n } from '../../hooks/useI18n';
 import { Button, Chip, Dialog, EmptyState, Field, SectionLabel } from '../../components/MD3';
 import Ripple from '../../components/Ripple';
 import { RADIUS } from '../../theme/theme';
 
 function ExtensionRow({ meta, installedVersion, busy, onInstall, onUninstall, onOpen }) {
   const theme = useAppTheme();
+  const { t } = useI18n();
   const installed = installedVersion != null;
   const updatable = installed && installedVersion !== meta.version;
 
@@ -57,7 +59,7 @@ function ExtensionRow({ meta, installedVersion, busy, onInstall, onUninstall, on
             <ActivityIndicator color={theme.primary} />
           ) : installed ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              {updatable ? <Button label="Update" variant="tonal" onPress={onInstall} /> : null}
+              {updatable ? <Button label={t('more.resetAction')} variant="tonal" onPress={onInstall} /> : null}
               <View style={{ borderRadius: RADIUS.pill, overflow: 'hidden' }}>
                 <Ripple onPress={onUninstall} borderless>
                   <View style={{ padding: 8 }}>
@@ -67,7 +69,7 @@ function ExtensionRow({ meta, installedVersion, busy, onInstall, onUninstall, on
               </View>
             </View>
           ) : (
-            <Button label="Install" onPress={onInstall} />
+            <Button label={t('settingsExtensions.install')} onPress={onInstall} />
           )}
         </View>
       </Ripple>
@@ -78,6 +80,7 @@ function ExtensionRow({ meta, installedVersion, busy, onInstall, onUninstall, on
 export default function ExtensionsScreen() {
   const theme = useAppTheme();
   const router = useRouter();
+  const { t } = useI18n();
   const {
     userRepositories,
     repoCatalog,
@@ -121,7 +124,7 @@ export default function ExtensionsScreen() {
       setDialogOpen(false);
       setRepoInput('');
     } catch (e) {
-      Alert.alert('Could not add repository', e.message);
+      Alert.alert(t('md3.somethingWentWrong'), e.message);
     } finally {
       setAdding(false);
     }
@@ -133,22 +136,22 @@ export default function ExtensionsScreen() {
       try {
         await installExtension(meta);
       } catch (e) {
-        Alert.alert('Install failed', e.message);
+        Alert.alert(t('settingsExtensions.installFailed'), e.message);
       } finally {
         setBusyId(null);
       }
     },
-    [installExtension],
+    [installExtension, t],
   );
 
   const handleUninstall = useCallback(
     (id, name) => {
-      Alert.alert('Uninstall extension', `Remove "${name}"?`, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Uninstall', style: 'destructive', onPress: () => uninstallExtension(id) },
+      Alert.alert(t('settingsExtensions.uninstallTitle'), t('settingsExtensions.uninstallConfirm', { name }), [
+        { text: t('more.resetCancel'), style: 'cancel' },
+        { text: t('settingsExtensions.uninstall'), style: 'destructive', onPress: () => uninstallExtension(id) },
       ]);
     },
-    [uninstallExtension],
+    [uninstallExtension, t],
   );
 
   const listData = tab === 'available' ? available : installedList;
@@ -166,20 +169,20 @@ export default function ExtensionsScreen() {
             }}
           >
             <Text style={{ color: theme.text, fontSize: 13, lineHeight: 19 }}>
-              No repositories added yet. Add a plugin list URL to see the sources it offers.
+              {t('settingsExtensions.noReposHint')}
             </Text>
           </View>
         ) : null}
 
         <View style={{ flexDirection: 'row' }}>
           <Chip
-            label={`Installed (${installedList.length})`}
+            label={`${t('settingsExtensions.installed')} (${installedList.length})`}
             selected={tab === 'installed'}
             onPress={() => setTab('installed')}
             icon="checkmark-circle"
           />
           <Chip
-            label={`Available (${available.length})`}
+            label={`${t('settingsExtensions.available')} (${available.length})`}
             selected={tab === 'available'}
             onPress={() => setTab('available')}
             icon="download"
@@ -187,7 +190,7 @@ export default function ExtensionsScreen() {
         </View>
 
         {tab === 'available' && userRepositories.length > 0 ? (
-          <Field value={search} onChangeText={setSearch} placeholder="Search extensions" />
+          <Field value={search} onChangeText={setSearch} placeholder={t('settingsExtensions.search')} />
         ) : null}
 
         {repoError ? <Text style={{ color: theme.error, fontSize: 12, lineHeight: 17 }}>{repoError}</Text> : null}
@@ -211,13 +214,13 @@ export default function ExtensionsScreen() {
             busy={busyId === item.id}
             onInstall={() => handleInstall(item)}
             onUninstall={() => handleUninstall(item.id, item.name)}
-            onOpen={() => router.push(`/browse/${encodeURIComponent(item.id)}`)}
+            onOpen={() => router.push(`/browse/${item.id}`)}
           />
         )}
         ListHeaderComponent={
           tab === 'available' && userRepositories.length > 0 ? (
             <View style={{ marginBottom: 10 }}>
-              <SectionLabel>From your repositories</SectionLabel>
+              <SectionLabel>{t('settingsExtensions.fromRepos')}</SectionLabel>
             </View>
           ) : null
         }
@@ -227,28 +230,28 @@ export default function ExtensionsScreen() {
               icon="server-outline"
               title={
                 userRepositories.length
-                  ? 'Nothing found in your repositories'
-                  : 'No repositories added'
+                  ? t('settingsExtensions.nothingFound')
+                  : t('settingsExtensions.noReposEmpty')
               }
               subtitle={
                 userRepositories.length
-                  ? 'This repository does not offer anything matching your search.'
-                  : 'Add a plugin repository URL to see the sources it offers. Nothing is bundled with the app.'
+                  ? t('settingsExtensions.nothingFoundSubtitle')
+                  : t('settingsExtensions.noReposEmptySubtitle')
               }
               action={
                 !userRepositories.length ? (
-                  <Button label="Add repository" onPress={() => setDialogOpen(true)} />
+                  <Button label={t('settingsExtensions.addRepo')} onPress={() => setDialogOpen(true)} />
                 ) : null
               }
             />
           ) : (
             <EmptyState
               icon="apps-outline"
-              title="No extensions installed"
-              subtitle="Install a source from the Available tab to start browsing novels."
+              title={t('settingsExtensions.noExtensions')}
+              subtitle={t('settingsExtensions.noExtensionsSubtitle')}
               action={
                 userRepositories.length ? (
-                  <Button label="See available sources" onPress={() => setTab('available')} />
+                  <Button label={t('settingsExtensions.seeAvailable')} onPress={() => setTab('available')} />
                 ) : null
               }
             />
@@ -256,14 +259,14 @@ export default function ExtensionsScreen() {
         }
       />
 
-      <Dialog visible={dialogOpen} title="Add plugin repository" onDismiss={() => setDialogOpen(false)}>
+      <Dialog visible={dialogOpen} title={t('settingsExtensions.addRepoTitle')} onDismiss={() => setDialogOpen(false)}>
         <Text style={{ color: theme.textMuted, fontSize: 13, marginBottom: 12, lineHeight: 19 }}>
-          Paste the URL of a plugin list (JSON). Sources are fetched from this URL only when you install them.
+          {t('settingsExtensions.addRepoSubtitle')}
         </Text>
         <Field value={repoInput} onChangeText={setRepoInput} placeholder="https://…/plugins.min.json" multiline autoFocus />
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
-          <Button label="Cancel" variant="text" onPress={() => setDialogOpen(false)} />
-          <Button label="Add" loading={adding} onPress={handleAddRepo} />
+          <Button label={t('more.resetCancel')} variant="text" onPress={() => setDialogOpen(false)} />
+          <Button label={t('settingsRepositories.add')} loading={adding} onPress={handleAddRepo} />
         </View>
       </Dialog>
     </View>

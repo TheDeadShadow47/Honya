@@ -2,17 +2,19 @@ import { ScrollView, Switch, Text, View } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { useStore } from '../../store/useStore';
 import { useAppTheme } from '../../hooks/useAppTheme';
+import { useI18n } from '../../hooks/useI18n';
 import { SectionLabel, Surface } from '../../components/MD3';
 import Ripple from '../../components/Ripple';
 import { RADIUS, READER_BACKGROUNDS } from '../../theme/theme';
 
 export default function ReaderSettingsScreen() {
   const theme = useAppTheme();
+  const { t } = useI18n();
   const { prefs, setPref } = useStore();
 
   return (
     <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-      <SectionLabel>Background</SectionLabel>
+      <SectionLabel>{t('settingsReader.background')}</SectionLabel>
       <Surface level={1} style={{ padding: 16, marginBottom: 18, flexDirection: 'row', gap: 12 }}>
         {READER_BACKGROUNDS.map((b) => (
           <Ripple key={b.key} onPress={() => setPref('readerBackground', b.key)}>
@@ -45,9 +47,9 @@ export default function ReaderSettingsScreen() {
         ))}
       </Surface>
 
-      <SectionLabel>Typography</SectionLabel>
+      <SectionLabel>{t('settingsReader.typography')}</SectionLabel>
       <Surface level={1} style={{ padding: 16 }}>
-        <Text style={{ color: theme.text, fontWeight: '700' }}>Font size · {prefs.fontSize}</Text>
+        <Text style={{ color: theme.text, fontWeight: '700' }}>{t('settingsReader.fontsize')} · {prefs.fontSize}</Text>
         <Slider
           minimumValue={12}
           maximumValue={32}
@@ -59,7 +61,7 @@ export default function ReaderSettingsScreen() {
           thumbTintColor={theme.primary}
         />
         <Text style={{ color: theme.text, fontWeight: '700', marginTop: 10 }}>
-          Line height · {prefs.lineHeight.toFixed(1)}
+          {t('settingsReader.lineheight')} · {prefs.lineHeight.toFixed(1)}
         </Text>
         <Slider
           minimumValue={1.2}
@@ -72,7 +74,7 @@ export default function ReaderSettingsScreen() {
           thumbTintColor={theme.primary}
         />
         <Text style={{ color: theme.text, fontWeight: '700', marginTop: 10 }}>
-          Side padding · {prefs.horizontalPadding}
+          {t('settingsReader.sidepadding')} · {prefs.horizontalPadding}
         </Text>
         <Slider
           minimumValue={8}
@@ -92,7 +94,7 @@ export default function ReaderSettingsScreen() {
         </View>
       </Surface>
 
-      <SectionLabel>Behavior</SectionLabel>
+      <SectionLabel>{t('settingsReader.behavior')}</SectionLabel>
       <Surface
         level={1}
         style={{
@@ -102,9 +104,9 @@ export default function ReaderSettingsScreen() {
         }}
       >
         <View style={{ flex: 1, marginRight: 12 }}>
-          <Text style={{ color: theme.text, fontWeight: '700' }}>Mark read on open</Text>
+          <Text style={{ color: theme.text, fontWeight: '700' }}>{t('settingsReader.markReadOnOpen')}</Text>
           <Text style={{ color: theme.textMuted, fontSize: 12.5, marginTop: 4, lineHeight: 18 }}>
-            When off, a chapter is marked read once you scroll to the end instead of as soon as you open it.
+            {t('settingsReader.markReadOnOpenSubtitle')}
           </Text>
         </View>
         <Switch

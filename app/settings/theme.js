@@ -2,6 +2,7 @@ import { ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
 import { useAppTheme } from '../../hooks/useAppTheme';
+import { useI18n } from '../../hooks/useI18n';
 import { THEMES, RADIUS } from '../../theme/theme';
 import Ripple from '../../components/Ripple';
 import { SectionLabel } from '../../components/MD3';
@@ -92,14 +93,15 @@ function ThemePreview({ theme, selected, onPress }) {
 
 export default function ThemeScreen() {
   const theme = useAppTheme();
+  const { t } = useI18n();
   const currentKey = useStore((s) => s.prefs.theme);
   const setPref = useStore((s) => s.setPref);
 
   return (
     <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-      <SectionLabel>App theme</SectionLabel>
+      <SectionLabel>{t('settingsTheme.title')}</SectionLabel>
       <Text style={{ color: theme.textMuted, fontSize: 13, lineHeight: 19, marginBottom: 14 }}>
-        The theme applies across the whole app and is remembered the next time you open it.
+        {t('settingsTheme.subtitle')}
       </Text>
       <View style={{ gap: 12 }}>
         {Object.values(THEMES).map((t) => (

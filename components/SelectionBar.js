@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../hooks/useAppTheme';
+import { useI18n } from '../hooks/useI18n';
 import { RADIUS, TOUCH } from '../theme/theme';
 import Ripple from './Ripple';
 
@@ -41,6 +42,7 @@ function SelectionBar({
   downloadingCount = 0,
 }) {
   const theme = useAppTheme();
+  const { t } = useI18n();
   const none = count === 0;
 
   return (
@@ -52,7 +54,7 @@ function SelectionBar({
     >
       <View style={styles.top}>
         <View style={{ borderRadius: RADIUS.pill, overflow: 'hidden' }}>
-          <Ripple onPress={onClose} borderless accessibilityLabel="Exit selection mode">
+          <Ripple onPress={onClose} borderless accessibilityLabel={t('selection.exit')}>
             <View style={styles.act}>
               <Ionicons name="close" size={22} color={theme.text} />
             </View>
@@ -60,19 +62,19 @@ function SelectionBar({
         </View>
         <Text style={{ color: theme.text, fontWeight: '800', fontSize: 16, flex: 1, marginLeft: 6 }}>
           {downloading
-            ? `Downloading ${downloadingCount} chapter${downloadingCount === 1 ? '' : 's'}…`
-            : `${count} selected`}
+            ? t('selection.downloading', { count: downloadingCount })
+            : t('selection.selected', { count })}
         </Text>
-        <Act icon="checkmark-done-outline" label="Select all" onPress={onToggleAll} />
+        <Act icon="checkmark-done-outline" label={t('selection.selectAll')} onPress={onToggleAll} />
       </View>
 
       <View style={[styles.actions, { borderTopColor: theme.outline }]}>
-        <Act icon="arrow-down-circle-outline" label="Download" onPress={onDownload} disabled={none || downloading} />
-        <Act icon="trash-outline" label="Remove download" onPress={onRemoveDownload} disabled={none} />
-        <Act icon="eye-outline" label="Mark read" onPress={onMarkRead} disabled={none} />
-        <Act icon="eye-off-outline" label="Mark unread" onPress={onMarkUnread} disabled={none} />
+        <Act icon="arrow-down-circle-outline" label={t('selection.download')} onPress={onDownload} disabled={none || downloading} />
+        <Act icon="trash-outline" label={t('selection.removeDownload')} onPress={onRemoveDownload} disabled={none} />
+        <Act icon="eye-outline" label={t('selection.markRead')} onPress={onMarkRead} disabled={none} />
+        <Act icon="eye-off-outline" label={t('selection.markUnread')} onPress={onMarkUnread} disabled={none} />
         <View style={{ flex: 1 }} />
-        <Text style={{ color: theme.textMuted, fontSize: 12, marginRight: 8 }}>of {total}</Text>
+        <Text style={{ color: theme.textMuted, fontSize: 12, marginRight: 8 }}>{t('selection.ofN', { count: total, plural: total === 1 ? '' : 's' })}</Text>
       </View>
 
       {/* Selection is always entered via long-press, so an anchor is always
@@ -81,9 +83,9 @@ function SelectionBar({
           selected — the two tapped chapters define the range. */}
       {hasAnchor ? (
         <View style={[styles.twoPoint, { borderTopColor: theme.outline }]}>
-          <Act icon="remove-circle-outline" label="Select all except this chapter" onPress={onSelectAllExcept} />
+          <Act icon="remove-circle-outline" label={t('selection.selectAllExcept')} onPress={onSelectAllExcept} />
           {canSelectBetween ? (
-            <Act icon="git-commit-outline" label="Select all in between" onPress={onSelectBetween} />
+            <Act icon="git-commit-outline" label={t('selection.selectBetween')} onPress={onSelectBetween} />
           ) : null}
           <View style={{ flex: 1 }} />
         </View>

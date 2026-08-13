@@ -2,6 +2,7 @@ import { memo, useCallback } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../hooks/useAppTheme';
+import { useI18n } from '../hooks/useI18n';
 import { alpha, RADIUS } from '../theme/theme';
 import Ripple from './Ripple';
 
@@ -29,6 +30,7 @@ const ChapterRow = memo(function ChapterRow({
   sourceName,
 }) {
   const theme = useAppTheme();
+  const { t } = useI18n();
   const read = !!chapter.read;
   const downloading = downloadState === 'downloading';
   const failed = downloadState === 'failed';
@@ -40,9 +42,9 @@ const ChapterRow = memo(function ChapterRow({
   if (showNumber && chapter.number != null) meta.push(`#${chapter.number}`);
   if (subtitle) meta.push(subtitle);
   else if (chapter.releaseTime) meta.push(String(chapter.releaseTime));
-  else if (!showNumber && chapter.number != null) meta.push(`Chapter ${chapter.number}`);
+  else if (!showNumber && chapter.number != null) meta.push(t('chapter.chapterNumber', { number: chapter.number }));
   if (showSource && sourceName) meta.push(sourceName);
-  if (downloaded) meta.push('Offline');
+  if (downloaded) meta.push(t('chapter.offline'));
   if (partial) meta.push(`${Math.round(progress * 100)}%`);
 
   const handlePress = useCallback(() => onPress?.(chapter), [onPress, chapter]);
@@ -103,7 +105,7 @@ const ChapterRow = memo(function ChapterRow({
 
         {selecting ? null : (
           <View style={styles.actionWrap}>
-            <Ripple borderless disabled={downloading} hitSlop={6} onPress={handleDownload} accessibilityLabel="Download chapter">
+            <Ripple borderless disabled={downloading} hitSlop={6} onPress={handleDownload} accessibilityLabel={t('chapter.download')}>
               <View style={styles.downloadButton}>
                 {downloading ? (
                   <ActivityIndicator size="small" color={theme.primary} />

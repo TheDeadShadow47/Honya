@@ -8,18 +8,31 @@ import { useStore } from '../store/useStore';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { isThemeDark } from '../theme/theme';
 import * as SplashScreen from 'expo-splash-screen';
+import { setLanguage, applyDirection, getLanguage, isRTL } from '../lib/i18n';
+import { useI18n } from '../hooks/useI18n';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const ready = useStore((s) => s.ready);
   const hydrate = useStore((s) => s.hydrate);
+  const lang = useStore((s) => s.prefs.lang);
   const theme = useAppTheme();
   const isDark = isThemeDark(theme);
+  const { t } = useI18n();
 
   useEffect(() => {
     hydrate().catch((e) => console.warn('hydrate failed', e));
   }, [hydrate]);
+
+  // Keep the in-memory language in sync with the persisted preference and
+  // apply the correct text direction (RTL for Arabic).
+  useEffect(() => {
+    if (lang) {
+      setLanguage(lang);
+      applyDirection();
+    }
+  }, [lang]);
 
   useEffect(() => {
     if (ready) {
@@ -28,7 +41,7 @@ export default function RootLayout() {
   }, [ready]);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.background }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.background, ...(isRTL() ? { writingDirection: 'rtl' } : {}) }}>
       <SafeAreaProvider>
         <StatusBar style={isDark ? 'light' : 'dark'} />
         {!ready ? (
@@ -43,20 +56,21 @@ export default function RootLayout() {
               headerTintColor: theme.text,
               headerShadowVisible: false,
               contentStyle: { backgroundColor: theme.background },
-              animation: 'slide_from_right',
+              animation: isRTL() ? 'slide_from_left' : 'slide_from_right',
             }}
           >
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="novel/[id]" options={{ headerShown: false }} />
-            <Stack.Screen name="novel/migrate" options={{ title: 'Migrate novel' }} />
+            <Stack.Screen name="novel/migrate" options={{ title: t('novel.migrateTitle') }} />
             <Stack.Screen name="reader/[chapterId]" options={{ headerShown: false }} />
-            <Stack.Screen name="browse/[pluginId]" options={{ title: 'Browse' }} />
-            <Stack.Screen name="settings/repositories" options={{ title: 'Repositories' }} />
-            <Stack.Screen name="settings/extensions" options={{ title: 'Extensions' }} />
-            <Stack.Screen name="settings/theme" options={{ title: 'Theme' }} />
-            <Stack.Screen name="settings/reader" options={{ title: 'Reader settings' }} />
-            <Stack.Screen name="settings/storage" options={{ title: 'Storage' }} />
-            <Stack.Screen name="settings/about" options={{ title: 'About' }} />
+            <Stack.Screen name="browse/[pluginId]" options={{ title: t('catalogs.browseSources') }} />
+            <Stack.Screen name="settings/repositories" options={{ title: t('settingsRepositories.title') }} />
+            <Stack.Screen name="settings/extensions" options={{ title: t('settingsExtensions.title') }} />
+            <Stack.Screen name="settings/theme" options={{ title: t('settingsTheme.title') }} />
+            <Stack.Screen name="settings/reader" options={{ title: t('settingsReader.title') }} />
+            <Stack.Screen name="settings/language" options={{ title: t('settingsLanguage.title') }} />
+            <Stack.Screen name="settings/storage" options={{ title: t('settingsStorage.title') }} />
+            <Stack.Screen name="settings/about" options={{ title: t('settingsAbout.title') }} />
           </Stack>
         )}
       </SafeAreaProvider>

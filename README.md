@@ -13,7 +13,7 @@ A minimal, offline-first novel reader built with **React Native and Expo**, feat
 ![SQLite](https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white)
 ![Zustand](https://img.shields.io/badge/Zustand-433E38?style=for-the-badge)
 
-[![Download APK](https://img.shields.io/badge/Download-APK-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/yourusername/honya/releases)
+[![Download APK](https://img.shields.io/badge/Download-APK-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/TheDeadShadow47/Honya/releases)
 
 </div>
 
@@ -82,7 +82,7 @@ Every UI element reads from a single `THEMES` table (`background`, `surface`, `s
 | Database | expo-sqlite v16 (WAL mode, serialized I/O) |
 | Animations | react-native-reanimated v4 + gesture-handler v2 |
 | UI | Hand-rolled Material Design 3 token system (`theme/theme.js`) |
-| Plugin engine | Sandboxed `eval` with fixed shim table |
+| Plugin engine | Sandboxed `new Function` with fixed shim table |
 
 ---
 
@@ -108,6 +108,7 @@ app/
   settings/
     repositories.js
     extensions.js
+    language.js
     theme.js
     reader.js
     storage.js
@@ -133,15 +134,19 @@ db/
 
 hooks/
   useAppTheme.js              Returns the active THEMES entry from Zustand prefs
+  useI18n.js                  Returns the current locale's `t()` translate function
 
 lib/
-  pluginEngine.js             LNReader-compatible sandboxed eval runtime
+  pluginEngine.js             LNReader-compatible sandboxed new Function runtime
   repository.js               fetchRepository() + normalizePlugin()
   clean.js                    HTML → plain-text strip + entity decode
   chapterPrefs.js             Per-novel filter/sort/display persistence
   chapterMatch.js             Chapter ID matching helpers
   migrate.js                  LNReader data migration utility
   time.js                    groupByDay() + relativeTime() formatting
+  i18n.js                    Translation lookup (en/ar/fr), RTL detection
+  navIds.js                  Encodes/decodes novel/chapter IDs for navigation
+  locales/                   Per-language translation tables (en.js, ar.js, fr.js)
 
 store/
   useStore.js                 Zustand store — prefs, repos, extensions, library,
@@ -184,7 +189,7 @@ Plugins expose a standard API (`popular()`, `latest()`, `search()`, `novel()`, `
 Clone the repository
 
 ```bash
-git clone https://github.com/yourusername/honya.git
+git clone https://github.com/TheDeadShadow47/Honya.git
 ```
 
 Enter the project directory
@@ -205,7 +210,6 @@ Run the app
 npx expo start          # Start dev server (QR code)
 npm run android         # Launch on connected Android device
 npm run ios             # Launch on connected iOS device / simulator
-npm run dev             # Start the local preview server (tools/preview-server.js)
 ```
 
 ---
@@ -237,6 +241,7 @@ The app has no default repositories — every source is user-provided.
 |---|---|
 | Repositories | Add / remove plugin repository URLs |
 | Extensions | List installed extensions; install new ones from repos |
+| Language | Switch the UI between English, العربية, and Français |
 | Theme | Pick one of 6 color themes |
 | Reader settings | Font size, line height, padding, background |
 | Storage | Database stats, clear downloaded chapters |
