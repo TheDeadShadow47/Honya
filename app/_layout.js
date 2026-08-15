@@ -25,7 +25,7 @@ export default function RootLayout() {
     hydrate().catch((e) => console.warn('hydrate failed', e));
   }, [hydrate]);
 
-  // Keep in-memory language in sync with the persisted pref before the first layout commits.
+  // Mirror the persisted language to the in-memory state and native I18nManager before the first layout commits.
   if (ready && lang && getLanguage() !== lang) {
     setLanguage(lang);
     applyDirection();

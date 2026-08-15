@@ -93,7 +93,7 @@ export default function ReaderScreen() {
   const { t } = useI18n();
   const contentPadTop = insets.top + 28;
 
-  // Pending reader context carries name + title up-front while the row loads.
+  // Pending reader context (set by the pushing screen) pre-loads the chapter name + novel title for the chrome.
   const bootCtxRef = useRef(null);
   if (bootCtxRef.current?.id !== id) {
     const taken = takePendingReader(id);
@@ -128,7 +128,7 @@ export default function ReaderScreen() {
   const slide = useRef(new Animated.Value(0)).current;
   const scrollRef = useRef(null);
   const touchStartRef = useRef(null);
-  // Scroll persistence: written at most once per second so SQLite never competes with the gesture.
+  // Scroll persistence: written at most once per second so SQLite never competes with the scroll gesture.
   const progressRef = useRef(0);
   const lastSaveRef = useRef(0);
   const restoredRef = useRef(false);
@@ -147,7 +147,7 @@ export default function ReaderScreen() {
   const appendingRef = useRef(false);
   const endRef = useRef(false);
   const viewportRef = useRef(0);
-  // Guards against stale async results and overlapping manual refreshes.
+  // Guards against stale async results (rapid chevron jumps) and overlapping manual refreshes.
   const loadGenRef = useRef(0);
   const loadBusyRef = useRef(false);
   const prefetchingRef = useRef(false);
@@ -185,7 +185,11 @@ export default function ReaderScreen() {
     return rec;
   }, []);
 
-  // Fetch a chapter's cleaned text from download cache, session cache, or plugin; `force` bypasses the session cache.
+  /**
+   * Fetch a chapter's cleaned text, from the download cache, the in-memory
+   * session cache, or the plugin. `force` bypasses the session cache (manual
+   * refresh). Concurrent requests for the same chapter share one promise.
+   */
   const fetchChapterText = useCallback(async (ch, { force = false } = {}) => {
     if (ch?.downloadedText) return sanitizeChapter(ch.downloadedText, { title: ch?.name });
     const key = ch?.id;
@@ -215,7 +219,12 @@ export default function ReaderScreen() {
     return run;
   }, [resolvePluginFor]);
 
-  // Best-effort background fetch of the next chapter so chevron/end navigation opens instantly.
+  /**
+   * Background fetch of the single next chapter (by number) so tapping the
+   * "next" chevron or scrolling to the end opens it almost instantly. Runs once
+   * per loaded chapter, only for a non-downloaded entry (an online session),
+   * and never duplicates an already-cached/in-flight request.
+   */
   const maybePrefetchNext = useCallback(
     (ch) => {
       if (prefetchingRef.current || !ch) return;
@@ -256,7 +265,7 @@ export default function ReaderScreen() {
       let seg = { id: next.id, name: next.name, ch: next, text: '', rtl: false, status: 'ready', error: null, offline: false };
       try {
         const text = await fetchChapterText(next);
-        // Each appended chapter computes its own direction from its own text.
+        // Each appended chapter gets its own direction from its own text, so a session can mix languages.
         seg = { ...seg, text, rtl: isArabicText(text) };
       } catch (e) {
         const msg = String(e?.message ?? '');
@@ -293,7 +302,15 @@ export default function ReaderScreen() {
     [refreshHistory, refreshLibrary],
   );
 
-  // Load the entry chapter: placeholder first, then cached/downloaded body, then remote fetch in the background.
+  /**
+   * Load the entry chapter for the reader.
+   *
+   * The reader becomes its own loading surface: a lightweight placeholder
+   * segment (chapter title + inline spinner) renders immediately, cached /
+   * downloaded bodies replace it the moment the DB row is read, and anything
+   * not yet local (a remote chapter) arrives in the background. History / read
+   * bookkeeping happens after the first render, never before it.
+   */
   const load = useCallback(async (force = false) => {
     if (loadBusyRef.current && force) return; // ignore refresh taps while one is running
     const gen = ++loadGenRef.current;
@@ -312,7 +329,7 @@ export default function ReaderScreen() {
     setSegments([]);
     setActiveIndex(0);
 
-    // Immediate placeholder so the reader never sits blank while the body loads.
+    // Immediate placeholder (title + spinner) so the reader screen never sits blank.
     const boot = {
       id,
       name: ctx?.name ?? '…',
@@ -334,7 +351,7 @@ export default function ReaderScreen() {
       setChapter(ch);
       installedRef.current = useStore.getState().installedExtensions;
 
-      // Novel read and text fetch run in parallel; a downloaded chapter doesn't need the novel row.
+      // Novel record and chapter-body fetch run in parallel — the DB read only gates a *non*-downloaded chapter.
       const novelPromise = db.getNovel(ch.novelId).then((nv) => {
         if (gen !== loadGenRef.current) return nv;
         novelRef.current = nv;
@@ -373,7 +390,7 @@ export default function ReaderScreen() {
         return;
       }
 
-      // Remote chapter: cache-first background fetch while the placeholder shows.
+      // Remote chapter: cache-first fetch in the background behind the placeholder.
       try {
         await novelPromise; // fast DB read; resolves the plugin for the fetch
         if (gen !== loadGenRef.current) return;
@@ -388,7 +405,7 @@ export default function ReaderScreen() {
         maybePrefetchNext(ch);
       } catch (e) {
         if (gen !== loadGenRef.current) return;
-        // Show a session-cached body instead of a dead error screen if available.
+        // Show a cached body from an earlier session instead of a dead error screen.
         const cached = fetchedTextCache.get(id);
         if (cached) {
           const seg = { ...makeSeg(cached.text), rtl: cached.rtl };
@@ -436,7 +453,12 @@ export default function ReaderScreen() {
     heightsRef.current[index] = height;
   }, []);
 
-  // Restore saved scroll once laid out, then keep appending while chapters don't fill the screen.
+  /**
+   * Restores the previous scroll position once the chapter body has been laid
+   * out, then keeps appending while chapters are too short to fill the screen.
+   * Runs once per chapter and only when there is meaningful progress, so a
+   * fresh chapter still starts at the top.
+   */
   const handleContentSizeChange = useCallback(
     (_w, height) => {
       if (loading) return;
@@ -451,7 +473,7 @@ export default function ReaderScreen() {
           scrollRef.current?.scrollTo({ y: 0, animated: false });
         }
       }
-      // Barely fills the viewport, so chain the next chapter in right away.
+      // Barely-overflowing list → pull the next chapter in right away; the < 300 bound keeps it from running away.
       if (!appendingRef.current && !endRef.current && height - viewportRef.current < 300) {
         appendNextSegment();
       }
@@ -732,7 +754,8 @@ export default function ReaderScreen() {
                       color: palette.fg,
                       fontSize: prefs.fontSize,
                       lineHeight: prefs.fontSize * prefs.lineHeight,
-                      // Direction is computed per-segment, independent of the app's RTL setting.
+                      // Direction comes from the segment's own text, not the UI RTL setting; textAlign must be
+                      // explicit or 'auto' resolves against I18nManager's global RTL (the Arabic-UI English bug).
                       writingDirection: seg.rtl ? 'rtl' : 'ltr',
                       textAlign: seg.rtl ? 'right' : 'left',
                     }}

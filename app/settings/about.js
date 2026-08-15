@@ -21,7 +21,7 @@ export default function AboutScreen() {
       <SectionLabel>{t('settingsAbout.status').toUpperCase()}</SectionLabel>
       <Surface level={1} style={{ padding: 16, marginBottom: 18 }}>
         <Text style={{ color: theme.text, fontSize: 14 }}>
-          {t('settingsAbout.version')} 1.2.0
+          {t('settingsAbout.version')} 1.1.0
         </Text>
         <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: 6 }}>
           {userRepositories.length} {t('settingsAbout.repositories')} ·{' '}

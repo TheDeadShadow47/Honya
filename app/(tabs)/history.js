@@ -11,7 +11,7 @@ import { setPendingReader } from '../../lib/readerContext';
 import { Button, EmptyState, Field, IconButton, ListHeading, ScreenHeader } from '../../components/MD3';
 import { groupByDay } from '../../lib/time';
 
-// Reading history, derived from the chapters table; resuming just pushes the normal reader route.
+// Reading history, derived from the chapters table; resuming a chapter just pushes the normal reader route.
 export default function HistoryScreen() {
   const theme = useAppTheme();
   const router = useRouter();

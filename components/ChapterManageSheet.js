@@ -62,7 +62,12 @@ const OptionRow = memo(function OptionRow({ label, hint, icon, selected, radio, 
   );
 });
 
-// Purely presentational: Filter, Sort and Display options, all state lives in the novel screen.
+/**
+ * Chapter management sheet: Filter, Sort and Display.
+ *
+ * Purely presentational — every value lives in the novel screen, so opening the
+ * sheet never touches the chapter list or triggers any chapter processing.
+ */
 function ChapterManageSheet({
   visible,
   onDismiss,

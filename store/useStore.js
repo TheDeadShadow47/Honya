@@ -13,12 +13,11 @@ const DOWNLOAD_CONCURRENCY = 3;
 const PREFS_KEY = '@honya/prefs';
 const REPOS_KEY = '@honya/repos';
 
-// Maps legacy Shosetsu AsyncStorage keys to the renamed @honya/* ones so installs migrate in place.
+// v1.1+ renamed Shosetsu-era AsyncStorage keys; this map migrates existing installs in place.
 const LEGACY_KEY_MAP = {
   '@shosetsu/prefs': PREFS_KEY,
   '@shosetsu/repos': REPOS_KEY,
   '@shosetsu/chapterPrefs': CHAPTER_PREFS_KEY,
-  '@shosetsu/lastBackup': backup.LAST_BACKUP_KEY,
 };
 
 /** One-time, idempotent: copies any legacy @shosetsu/* values to their @honya/* key, then removes the old key. */
@@ -62,7 +61,6 @@ export const useStore = create((set, get) => ({
   updates: [],
   history: [],
   downloadStates: {},
-  lastBackup: null,
 
   /* ---------- bootstrap ---------- */
   hydrate: async () => {
@@ -82,12 +80,11 @@ export const useStore = create((set, get) => ({
     plugins.forEach((p) => {
       installedExtensions[p.id] = p;
     });
-    const lastBackup = await backup.getLastBackupMeta();
 
     await loadChapterPrefs();
     setLanguage(prefs.lang);
     applyDirection();
-    set({ prefs, userRepositories: repos, installedExtensions, lastBackup, ready: true });
+    set({ prefs, userRepositories: repos, installedExtensions, ready: true });
     await get().refreshLibrary();
     await get().refreshUpdates();
     await get().refreshHistory();
@@ -245,7 +242,10 @@ export const useStore = create((set, get) => ({
   refreshLibrary: async () => set({ library: await db.getLibrary() }),
   refreshUpdates: async () => set({ updates: await db.getRecentUpdates() }),
 
-  /* history: reads straight from the existing chapters table. */
+  /* history 
+   * Reads straight from the chapters table (the existing source of truth for
+   * reading state). No separate history storage exists.
+   */
   refreshHistory: async () => set({ history: await db.getHistory() }),
   removeHistoryEntry: async (chapterId) => {
     await db.removeHistoryEntry(chapterId);
@@ -268,7 +268,11 @@ export const useStore = create((set, get) => ({
     await get().refreshHistory();
   },
 
-  /* backup / restore: see lib/backup.js for the file format. */
+  /* ---------- backup / restore ----------
+   * See lib/backup.js for the file format. Downloaded chapter text, cover
+   * files and plugin source code are never included - only library,
+   * progress, settings, repositories and extension metadata.
+   */
   createBackup: async () => {
     const data = {
       prefs: get().prefs,
@@ -277,10 +281,7 @@ export const useStore = create((set, get) => ({
       extensions: await db.getExtensionsMeta(),
       novels: await db.getBackupSnapshot(),
     };
-    const file = await backup.writeBackupToFile(data);
-    const meta = { at: file.createdAt, size: file.size, novels: data.novels.length };
-    await backup.recordBackupMeta(meta);
-    set({ lastBackup: meta });
+    const file = await backup.createBackupInFolder(data);
     return { ...file, novels: data.novels.length, extensions: data.extensions.length };
   },
 
@@ -289,7 +290,7 @@ export const useStore = create((set, get) => ({
     const raw = await backup.readBackupFile(fileUri);
     const parsed = backup.validateBackup(raw); // throws before anything is written
 
-    // Accept only known pref keys with the expected primitive type (backup is untrusted input).
+    // Only accept known pref keys with the expected type — backups are untrusted input.
     const safePrefs = {};
     for (const key of Object.keys(DEFAULT_PREFS)) {
       if (key in parsed.prefs && typeof parsed.prefs[key] === typeof DEFAULT_PREFS[key]) {

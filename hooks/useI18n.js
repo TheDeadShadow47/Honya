@@ -1,10 +1,21 @@
-// Hook exposing the current translation function and language info, re-rendering on language change.
+/**
+ * Hook that exposes the current translation function and language info.
+ *
+ * Re-renders when the application language changes so that any component
+ * consuming translations updates automatically.
+ */
 
 import { useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { getLanguage, setLanguage, isRTL, applyDirection, t as translate } from '../lib/i18n';
 
-// Returns the translation function bound to the current language: const { t, lang, rtl } = useI18n();
+/**
+ * Returns the translation function bound to the current language.
+ *
+ * Usage:
+ *   const { t, lang, rtl } = useI18n();
+ *   t('nav.library')
+ */
 export function useI18n() {
   const lang = useStore((s) => s.prefs.lang);
 

@@ -2,7 +2,14 @@ import { Platform, Pressable } from 'react-native';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { alpha } from '../theme/theme';
 
-// Pressable with a native Android ripple (UI-thread feedback); hitSlop gives small icons a comfy target.
+/**
+ * Press surface with a native Android ripple.
+ *
+ * Uses Pressable's built-in `android_ripple` (rendered by the platform on the
+ * UI thread) instead of a JS-driven opacity animation, so touch feedback stays
+ * at 60fps even while a list is scrolling. `hitSlop` gives small icons a
+ * comfortable Android touch target without changing layout.
+ */
 export default function Ripple({
   children,
   onPress,
