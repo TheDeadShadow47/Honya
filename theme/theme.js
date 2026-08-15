@@ -133,10 +133,7 @@ export const READER_BACKGROUNDS = [
   { key: 'white', name: 'White', bg: '#ffffff', fg: '#16161a' },
 ];
 
-/* ---------- shared layout tokens ----------
- * Single source of truth for spacing, type scale and elevation so every screen
- * uses the same rhythm instead of ad-hoc numbers.
- */
+// Shared layout tokens: single source of truth for spacing, type scale and elevation.
 export const SPACING = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
 
 export const TYPE = {

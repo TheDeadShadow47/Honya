@@ -25,8 +25,7 @@ export default function RootLayout() {
     hydrate().catch((e) => console.warn('hydrate failed', e));
   }, [hydrate]);
 
-  // Keep the in-memory language in sync with the persisted pref and mirror it
-  // to the native I18nManager before the first layout commits.
+  // Keep in-memory language in sync with the persisted pref before the first layout commits.
   if (ready && lang && getLanguage() !== lang) {
     setLanguage(lang);
     applyDirection();
@@ -74,6 +73,7 @@ export default function RootLayout() {
             <Stack.Screen name="settings/reader" options={{ title: t('settingsReader.title') }} />
             <Stack.Screen name="settings/language" options={{ title: t('settingsLanguage.title') }} />
             <Stack.Screen name="settings/storage" options={{ title: t('settingsStorage.title') }} />
+            <Stack.Screen name="settings/backup" options={{ title: t('settingsBackup.title') }} />
             <Stack.Screen name="settings/about" options={{ title: t('settingsAbout.title') }} />
           </Stack>
         )}

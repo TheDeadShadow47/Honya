@@ -9,10 +9,7 @@ import { ProgressBar } from './MD3';
 import Ripple from './Ripple';
 import Cover from './Cover';
 
-/**
- * One reading-history entry. Tapping resumes the chapter in the existing
- * reader; the chevron affordance and the whole row share the same action.
- */
+// One reading-history entry; tapping resumes the chapter in the existing reader.
 const HistoryRow = memo(function HistoryRow({ item, onPress, onLongPress }) {
   const theme = useAppTheme();
   const { t } = useI18n();

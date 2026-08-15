@@ -7,11 +7,7 @@ import { useAppTheme } from '../../hooks/useAppTheme';
 import { RADIUS } from '../../theme/theme';
 import { useI18n } from '../../hooks/useI18n';
 
-/**
- * Material 3 style navigation bar. The active pill is a plain View that swaps
- * background colour — no JS animation runs on tab change, which keeps switching
- * instant on Android.
- */
+// Material 3 style nav bar; the active pill swaps colour with no JS animation.
 const ICONS = {
   index: ['library', 'library-outline'],
   updates: ['notifications', 'notifications-outline'],

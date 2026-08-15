@@ -3,18 +3,7 @@ import * as SQLite from 'expo-sqlite';
 let dbPromise;
 let queue = Promise.resolve();
 
-/**
- * expo-sqlite dispatches async operations onto a multi-threaded IO executor
- * (Dispatchers.IO on Android) and never sets a busy timeout. When two calls
- * overlap, the losing write aborts with `database is locked` (SQLITE_BUSY) —
- * which surfaces as a rejected `NativeStatement.finalizeAsync` because
- * sqlite3_finalize() returns the last failed step() result code.
- *
- * Every database function in this module runs through this queue so no two
- * operations on the single connection ever overlap, including entire
- * `withTransactionAsync` bodies (which the library otherwise treats as
- * non-exclusive).
- */
+// Serializes every DB call (including transactions) to avoid SQLITE_BUSY from overlapping ops.
 function serialize(task) {
   const result = queue.then(task);
   queue = result.then(
@@ -78,17 +67,11 @@ export function initDatabase() {
   });
 }
 
-/**
- * Additive migrations. Each step is guarded so it is safe to run on every boot
- * and on databases created by any previous version of the app. Existing rows,
- * schema and data are never rewritten.
- */
+// Additive migrations, guarded so they're safe on every boot and any previous schema.
 async function migrate(db) {
   const cols = await db.getAllAsync('PRAGMA table_info(chapters)');
   const has = (name) => cols.some((c) => c.name === name);
-  // Reading history: the chapters table stays the single source of truth for
-  // reading state. `lastReadAt` records when the chapter was last opened so the
-  // History screen can order by recency without a second table.
+  // Reading history: the chapters table is the single source of truth; lastReadAt orders it.
   if (!has('lastReadAt')) {
     await db.execAsync('ALTER TABLE chapters ADD COLUMN lastReadAt INTEGER');
     // Backfill so existing read chapters still show up in History.
@@ -110,12 +93,7 @@ export function upsertNovel(novel) {
        ON CONFLICT(id) DO UPDATE SET
          title=excluded.title, author=excluded.author, cover=excluded.cover,
          status=excluded.status, summary=excluded.summary, genres=excluded.genres`,
-         // NOTE: inLibrary is intentionally NOT in the conflict-update clause.
-         // Browse/search screens upsert novel metadata (with inLibrary:false) on
-         // every load. Overwriting inLibrary here would silently drop novels the
-         // user already added to the library. Library membership is only changed
-         // through setInLibrary/toggleLibrary; a fresh INSERT still honours the
-         // caller's value.
+         // NOTE: inLibrary is intentionally NOT updated on conflict - browse upserts would drop library membership.
       [
         novel.id,
         novel.pluginId ?? null,
@@ -201,13 +179,7 @@ export function replaceChapters(novelId, chapters) {
   });
 }
 
-/**
- * Lightweight chapter fetch for UI lists.  Excludes the downloadedText column
- * (which can hold hundreds of KB per downloaded chapter) and replaces it with
- * a cheap boolean `downloaded` flag.  This is the primary source of truth for
- * the novel-details chapter list and selection — it must NOT be used where the
- * actual text body is needed (e.g. the reader).
- */
+// Lightweight chapter list fetch; excludes downloadedText, exposes a cheap `downloaded` boolean instead.
 export function getChapters(novelId) {
   return serialize(async () => {
     const db = await getDb();
@@ -222,11 +194,7 @@ export function getChapters(novelId) {
   });
 }
 
-/**
- * Full chapter fetch including the downloadedText body.  Used by migration
- * (which must transfer download state between sources) and the reader.  Avoid
- * in UI lists — prefer getChapters for performance.
- */
+// Full chapter fetch including downloadedText; used by migration and the reader only.
 export function getChaptersFull(novelId) {
   return serialize(async () => {
     const db = await getDb();
@@ -268,10 +236,7 @@ export function markChapterRead(chapterId, read = true) {
   });
 }
 
-/**
- * Batch variant of markChapterRead used by chapter multi-select. Same columns,
- * same semantics - one transaction instead of N round trips.
- */
+// Batch variant of markChapterRead for multi-select; one transaction instead of N round trips.
 export function markChaptersRead(chapterIds, read = true) {
   const ids = Array.from(new Set((chapterIds ?? []).filter(Boolean)));
   if (!ids.length) return Promise.resolve();
@@ -289,11 +254,7 @@ export function markChaptersRead(chapterIds, read = true) {
   });
 }
 
-/**
- * Records that a chapter was opened in the reader. This is the only write the
- * History screen relies on - reading state itself still lives on the chapters
- * row, so there is no separate history store.
- */
+// Records that a chapter was opened in the reader; drives the History screen.
 export function touchChapterRead(chapterId, at = Date.now()) {
   return serialize(async () => {
     const db = await getDb();
@@ -363,11 +324,7 @@ export function deleteChapterText(chapterId) {
   });
 }
 
-/**
- * Inserts chapters created by a migration. `state` is a Map of
- * target index -> { read, progress, downloadedText, updatedAt } produced by
- * matchChapterState, so user progress and downloads survive the move.
- */
+// Inserts migration-created chapters, carrying over matched read/progress/download state.
 export function insertChaptersWithState(novelId, chapters, state = new Map()) {
   return serialize(async () => {
     const db = await getDb();
@@ -480,5 +437,96 @@ export function clearDownloads() {
   return serialize(async () => {
     const db = await getDb();
     await db.runAsync('UPDATE chapters SET downloadedText = NULL');
+  });
+}
+
+/* ---------- backup / restore ---------- */
+
+// Backup snapshot: library/read novels with per-chapter state, never downloadedText.
+export function getBackupSnapshot() {
+  return serialize(async () => {
+    const db = await getDb();
+    const novels = await db.getAllAsync(
+      `SELECT DISTINCT n.* FROM novels n
+         LEFT JOIN chapters c ON c.novelId = n.id
+        WHERE n.inLibrary = 1 OR c.read = 1 OR c.lastReadAt IS NOT NULL`,
+    );
+    const out = [];
+    for (const row of novels) {
+      const novel = mapNovel(row);
+      const chapters = await db.getAllAsync(
+        `SELECT id, path, name, releaseTime, number, read, progress, lastReadAt, updatedAt
+           FROM chapters WHERE novelId = ? ORDER BY number ASC`,
+        [novel.id],
+      );
+      out.push({ ...novel, chapters: chapters.map((c) => ({ ...c, read: !!c.read })) });
+    }
+    return out;
+  });
+}
+
+/** Installed-extension metadata only, no `code`. Kept in backups for reference only. */
+export function getExtensionsMeta() {
+  return serialize(async () => {
+    const db = await getDb();
+    return db.getAllAsync(
+      'SELECT id, name, version, lang, iconUrl, site, repoUrl, installedAt FROM plugins ORDER BY name COLLATE NOCASE',
+    );
+  });
+}
+
+// Restores a full snapshot atomically; inLibrary is overwritten, downloads are never restored.
+export function restoreLibrarySnapshot(novels) {
+  return serialize(async () => {
+    const db = await getDb();
+    await db.withTransactionAsync(async () => {
+      for (const novel of novels) {
+        await db.runAsync(
+          `INSERT INTO novels (id, pluginId, path, title, author, cover, status, summary, genres, inLibrary, addedAt)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?)
+           ON CONFLICT(id) DO UPDATE SET
+             pluginId=excluded.pluginId, path=excluded.path, title=excluded.title, author=excluded.author,
+             cover=excluded.cover, status=excluded.status, summary=excluded.summary, genres=excluded.genres,
+             inLibrary=excluded.inLibrary`,
+          [
+            novel.id,
+            novel.pluginId ?? null,
+            novel.path ?? null,
+            novel.title ?? 'Untitled',
+            novel.author ?? null,
+            novel.cover ?? null,
+            novel.status ?? null,
+            novel.summary ?? null,
+            JSON.stringify(novel.genres ?? []),
+            novel.inLibrary ? 1 : 0,
+            novel.addedAt ?? Date.now(),
+          ],
+        );
+        const chapters = Array.isArray(novel.chapters) ? novel.chapters : [];
+        for (let i = 0; i < chapters.length; i += 1) {
+          const c = chapters[i];
+          if (!c?.id) continue;
+          await db.runAsync(
+            `INSERT INTO chapters (id, novelId, path, name, releaseTime, number, read, progress, lastReadAt, updatedAt)
+             VALUES (?,?,?,?,?,?,?,?,?,?)
+             ON CONFLICT(id) DO UPDATE SET
+               path=excluded.path, name=excluded.name, releaseTime=excluded.releaseTime, number=excluded.number,
+               read=excluded.read, progress=excluded.progress, lastReadAt=excluded.lastReadAt, updatedAt=excluded.updatedAt`,
+            [
+              c.id,
+              novel.id,
+              c.path ?? null,
+              c.name ?? `Chapter ${i + 1}`,
+              c.releaseTime ?? null,
+              c.number ?? i + 1,
+              c.read ? 1 : 0,
+              Number(c.progress) || 0,
+              c.lastReadAt ?? null,
+              c.updatedAt ?? Date.now(),
+            ],
+          );
+        }
+      }
+    });
   });
 }

@@ -118,6 +118,13 @@ export default function MoreScreen() {
           onPress={() => router.push('/settings/storage')}
         />
         <Divider />
+        <Row
+          icon="cloud-upload-outline"
+          title={t('more.backup')}
+          subtitle={t('more.backupSubtitle')}
+          onPress={() => router.push('/settings/backup')}
+        />
+        <Divider />
         <Row icon="information-circle-outline" title={t('more.about')} onPress={() => router.push('/settings/about')} />
         <Divider />
         <Row

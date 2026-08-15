@@ -4,13 +4,40 @@ import * as db from '../db/database';
 import { fetchRepository, fetchPluginCode } from '../lib/repository';
 import { loadPlugin, pluginApi, unloadPlugin } from '../lib/pluginEngine';
 import { sanitizeChapter } from '../lib/clean';
-import { loadChapterPrefs } from '../lib/chapterPrefs';
+import { loadChapterPrefs, getChapterPrefsSnapshot, restoreChapterPrefsSnapshot, CHAPTER_PREFS_KEY } from '../lib/chapterPrefs';
 import { setLanguage, applyDirection } from '../lib/i18n';
+import * as backup from '../lib/backup';
 
 const DOWNLOAD_CONCURRENCY = 3;
 
-const PREFS_KEY = '@shosetsu/prefs';
-const REPOS_KEY = '@shosetsu/repos';
+const PREFS_KEY = '@honya/prefs';
+const REPOS_KEY = '@honya/repos';
+
+// Maps legacy Shosetsu AsyncStorage keys to the renamed @honya/* ones so installs migrate in place.
+const LEGACY_KEY_MAP = {
+  '@shosetsu/prefs': PREFS_KEY,
+  '@shosetsu/repos': REPOS_KEY,
+  '@shosetsu/chapterPrefs': CHAPTER_PREFS_KEY,
+  '@shosetsu/lastBackup': backup.LAST_BACKUP_KEY,
+};
+
+/** One-time, idempotent: copies any legacy @shosetsu/* values to their @honya/* key, then removes the old key. */
+async function migrateLegacyStorageKeys() {
+  const pairs = Object.entries(LEGACY_KEY_MAP);
+  const allKeys = pairs.flatMap(([oldKey, newKey]) => [oldKey, newKey]);
+  const results = await AsyncStorage.multiGet(allKeys);
+  const values = Object.fromEntries(results);
+  const toSet = [];
+  const toRemove = [];
+  for (const [oldKey, newKey] of pairs) {
+    if (values[oldKey] != null) {
+      if (values[newKey] == null) toSet.push([newKey, values[oldKey]]);
+      toRemove.push(oldKey);
+    }
+  }
+  if (toSet.length) await AsyncStorage.multiSet(toSet);
+  if (toRemove.length) await AsyncStorage.multiRemove(toRemove);
+}
 
 export const DEFAULT_PREFS = {
   theme: 'honya',
@@ -35,10 +62,12 @@ export const useStore = create((set, get) => ({
   updates: [],
   history: [],
   downloadStates: {},
+  lastBackup: null,
 
   /* ---------- bootstrap ---------- */
   hydrate: async () => {
     await db.initDatabase();
+    await migrateLegacyStorageKeys();
     const [prefsRaw, reposRaw] = await AsyncStorage.multiGet([PREFS_KEY, REPOS_KEY]);
     let prefs = DEFAULT_PREFS;
     let repos = [];
@@ -53,11 +82,12 @@ export const useStore = create((set, get) => ({
     plugins.forEach((p) => {
       installedExtensions[p.id] = p;
     });
+    const lastBackup = await backup.getLastBackupMeta();
 
     await loadChapterPrefs();
     setLanguage(prefs.lang);
     applyDirection();
-    set({ prefs, userRepositories: repos, installedExtensions, ready: true });
+    set({ prefs, userRepositories: repos, installedExtensions, lastBackup, ready: true });
     await get().refreshLibrary();
     await get().refreshUpdates();
     await get().refreshHistory();
@@ -215,10 +245,7 @@ export const useStore = create((set, get) => ({
   refreshLibrary: async () => set({ library: await db.getLibrary() }),
   refreshUpdates: async () => set({ updates: await db.getRecentUpdates() }),
 
-  /* history 
-   * Reads straight from the chapters table (the existing source of truth for
-   * reading state). No separate history storage exists.
-   */
+  /* history: reads straight from the existing chapters table. */
   refreshHistory: async () => set({ history: await db.getHistory() }),
   removeHistoryEntry: async (chapterId) => {
     await db.removeHistoryEntry(chapterId);
@@ -239,6 +266,54 @@ export const useStore = create((set, get) => ({
     await get().refreshLibrary();
     await get().refreshUpdates();
     await get().refreshHistory();
+  },
+
+  /* backup / restore: see lib/backup.js for the file format. */
+  createBackup: async () => {
+    const data = {
+      prefs: get().prefs,
+      chapterPrefs: await getChapterPrefsSnapshot(),
+      repositories: get().userRepositories,
+      extensions: await db.getExtensionsMeta(),
+      novels: await db.getBackupSnapshot(),
+    };
+    const file = await backup.writeBackupToFile(data);
+    const meta = { at: file.createdAt, size: file.size, novels: data.novels.length };
+    await backup.recordBackupMeta(meta);
+    set({ lastBackup: meta });
+    return { ...file, novels: data.novels.length, extensions: data.extensions.length };
+  },
+
+  /** Validates and applies a backup file. Throws BackupError before touching any state if invalid. */
+  restoreBackup: async (fileUri) => {
+    const raw = await backup.readBackupFile(fileUri);
+    const parsed = backup.validateBackup(raw); // throws before anything is written
+
+    // Accept only known pref keys with the expected primitive type (backup is untrusted input).
+    const safePrefs = {};
+    for (const key of Object.keys(DEFAULT_PREFS)) {
+      if (key in parsed.prefs && typeof parsed.prefs[key] === typeof DEFAULT_PREFS[key]) {
+        safePrefs[key] = parsed.prefs[key];
+      }
+    }
+
+    await db.restoreLibrarySnapshot(parsed.novels);
+    await restoreChapterPrefsSnapshot(parsed.chapterPrefs);
+
+    const mergedRepos = Array.from(new Set([...get().userRepositories, ...parsed.repositories]));
+    const mergedPrefs = { ...DEFAULT_PREFS, ...get().prefs, ...safePrefs };
+    await AsyncStorage.setItem(REPOS_KEY, JSON.stringify(mergedRepos));
+    await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(mergedPrefs));
+
+    setLanguage(mergedPrefs.lang);
+    applyDirection();
+    set({ prefs: mergedPrefs, userRepositories: mergedRepos });
+
+    await get().refreshLibrary();
+    await get().refreshUpdates();
+    await get().refreshHistory();
+
+    return parsed.meta;
   },
 }));
 

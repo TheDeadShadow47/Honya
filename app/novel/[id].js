@@ -18,9 +18,7 @@ import SelectionBar from '../../components/SelectionBar';
 const DEFAULT_FILTERS = { downloaded: false, unread: false };
 const DEFAULT_DISPLAY = { sourceTitle: false, chapterNumber: false };
 
-// Rapid re-entry (open → back → open) would otherwise fire a fresh network
-// fetch on every mount. A module-level Map remembers the last successful fetch
-// so the auto-refresh is throttled; the manual Refresh button always bypasses it.
+// Throttles auto-refresh on rapid re-entry; the manual Refresh button bypasses it.
 const FETCH_THROTTLE_MS = 10 * 60 * 1000;
 const lastFetchedAt = new Map();
 
@@ -46,9 +44,7 @@ export default function NovelDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [chaptersLoaded, setChaptersLoaded] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
-  // Saved per-novel list settings, restored synchronously from the in-memory
-  // cache (populated during hydrate / mount) so a returning novel shows its
-  // saved filters/sort/display on the very first render — no flash of defaults.
+  // Restored from the in-memory cache so saved settings appear on first render.
   const initialPrefs = getCachedChapterPrefs(novelId);
   const [filters, setFilters] = useState(initialPrefs?.filters ?? DEFAULT_FILTERS);
   const [sortKey, setSortKey] = useState(initialPrefs?.sortKey ?? 'numberAsc');
@@ -57,9 +53,7 @@ export default function NovelDetailsScreen() {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [anchorId, setAnchorId] = useState(null);
 
-  // Last-persisted snapshot for this novel, seeded with whatever state was just
-  // restored. The effect below only writes to AsyncStorage when the settings
-  // actually change, so re-entering a novel never causes a redundant write.
+  // Last-persisted snapshot; the effect only writes when settings actually change.
   const savedPrefsRef = useRef(
     JSON.stringify({
       filters: initialPrefs?.filters ?? DEFAULT_FILTERS,
@@ -76,22 +70,17 @@ export default function NovelDetailsScreen() {
     saveChapterPrefs(novelId, next);
   }, [filters, sortKey, display, novelId]);
 
-  // Number of chapters queued by the current bulk download; 0 while idle. The
-  // toolbar shows aggregate progress ("Downloading N chapters…") while it runs.
+  // Chapters queued by the current bulk download; 0 while idle.
   const [bulkDownloading, setBulkDownloading] = useState(0);
 
-  // Refresh spinner for the header action; a ref guard prevents a second
-  // request while one is already in flight (rapid taps / long refreshes).
+  // Refresh spinner for the header action; a ref guard blocks concurrent requests.
   const [refreshing, setRefreshing] = useState(false);
   const refreshingRef = useRef(false);
 
-  // Set to true when this screen instance is unmounted, so async work that
-  // resolves afterwards (DB reads, a slow network fetch) does not touch state
-  // or clog the DB queue with writes the user no longer wants.
+  // Set on unmount so late async work never touches state or the DB queue.
   const cancelledRef = useRef(false);
 
-  // Live mirror of the loaded novel for callbacks that must stay stable (the
-  // memoised ChapterRow renderer) but still read the current title.
+  // Live mirror of the loaded novel for stable callbacks.
   const novelRef = useRef(null);
   novelRef.current = novel;
 
@@ -124,9 +113,7 @@ export default function NovelDetailsScreen() {
           inLibrary: base.inLibrary,
         };
         await db.upsertNovel(merged);
-        // Bail before the (potentially large) chapter rewrite if the screen was
-        // closed while the network call was in flight — that batch would clog the
-        // DB queue and stall any screen opened in its place.
+        // Bail before the large chapter rewrite if the screen closed mid-fetch.
         if (cancelledRef.current) return;
         if (Array.isArray(detail?.chapters) && detail.chapters.length) {
           await db.replaceChapters(
@@ -149,11 +136,7 @@ export default function NovelDetailsScreen() {
     cancelledRef.current = false;
     let cancelled = false;
     (async () => {
-      // Novel first so the header (title/cover/back) is usable immediately; the
-      // chapter list streams in behind it without a full-screen gate.
-      // These two reads are independent, so they run together instead of one
-      // waiting on the other — loadChapterPrefs() is also a no-op after the
-      // first call, so this is normally just the DB read.
+      // Novel first for the header; chapters stream in behind it. The two reads are independent.
       const [base] = await Promise.all([db.getNovel(novelId), loadChapterPrefs()]);
       if (cancelled) return;
       const restored = getCachedChapterPrefs(novelId);
@@ -169,8 +152,7 @@ export default function NovelDetailsScreen() {
       if (cancelled) return;
       setChapters(list);
       setChaptersLoaded(true);
-      // Skip the network round-trip within the throttle window (rapid
-      // open → back → open) so the DB queue is not re-clogged.
+      // Skip the network round-trip within the throttle window.
       if (base && Date.now() - (lastFetchedAt.get(novelId) ?? 0) > FETCH_THROTTLE_MS) {
         fetchRemote(base);
       }
@@ -183,8 +165,7 @@ export default function NovelDetailsScreen() {
 
   /* ---------- derived chapter data (computed once per input change) ---------- */
 
-  // Filter, then sort. Display preferences are applied at render time, so
-  // toggling them never re-sorts or re-filters thousands of rows.
+  // Filter, then sort; display prefs are render-time only.
   const visibleChapters = useMemo(() => {
     let list = chapters;
     if (filters.downloaded) list = list.filter((c) => !!c.downloaded);
@@ -199,9 +180,7 @@ export default function NovelDetailsScreen() {
     return sorted;
   }, [chapters, filters, sortKey]);
 
-  // Resume target: the chapter that was last opened and left unfinished,
-  // otherwise the first unread chapter. Uses the existing reading-progress
-  // columns only — no second progress system.
+  // Resume target: last unfinished chapter, else first unread; uses existing progress columns only.
   const { resumeChapter, resumeIsContinue } = useMemo(() => {
     let inProgress = null;
     let firstUnread = null;
@@ -241,8 +220,7 @@ export default function NovelDetailsScreen() {
     });
   }, []);
 
-  // Android hardware back: exit selection mode first, then let the router
-  // handle navigation.
+  // Android hardware back: exit selection mode first, then let the router navigate.
   useEffect(() => {
     if (!selecting) return undefined;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -272,20 +250,14 @@ export default function NovelDetailsScreen() {
 
   /* ---------- one-tap range actions ---------- */
 
-  // Both operate on the *displayed* order (filters + sort applied), so the
-  // selection follows what the user sees rather than the raw chapter order.
-  // They only expand the selection — the existing bulk actions (download, mark
-  // read, remove download) then act on it. The anchor (the long-pressed chapter
-  // that entered selection mode) is kept so the user can keep re-framing the
-  // "except this" and "in between" selections.
+  // Range actions expand the displayed-order selection; the anchor re-frames "except this" / "in between".
   const selectAllExcept = useCallback(() => {
     const next = new Set(visibleRef.current.map((c) => c.id));
     next.delete(anchorIdRef.current);
     setSelectedIds(next);
   }, []);
 
-  // Available once exactly two chapters are selected: selects every displayed
-  // chapter between them, inclusive.
+  // With exactly two selected, selects every displayed chapter between them.
   const selectBetween = useCallback(() => {
     const list = visibleRef.current;
     const [a, b] = Array.from(selectedRef.current);
@@ -319,10 +291,7 @@ export default function NovelDetailsScreen() {
     [router, toggleSelect],
   );
 
-  // Long-press always enters selection mode with that chapter as the anchor and
-  // sole selection. A later long-press while already selecting re-anchors, so
-  // "Select all except this" follows the newest long-pressed chapter. Everything
-  // else in selection mode is a plain tap that toggles.
+  // Long-press enters selection mode with that chapter as anchor; later long-presses re-anchor.
   const longPressChapter = useCallback((chapter) => {
     if (!selectingRef.current) setSelecting(true);
     setAnchorId(chapter.id);
@@ -366,9 +335,7 @@ export default function NovelDetailsScreen() {
 
   const bulkDownload = useCallback(async () => {
     if (bulkDownloadingRef.current > 0) return;
-    // Only queue chapters not already downloaded — duplicates are harmless
-    // (the store guards downloadStates[id] === 'downloading') but this
-    // avoids wasting the concurrency slots and gives a clearer UX.
+    // Skip chapters already downloaded to save concurrency slots.
     const list = selectedChapters().filter((c) => !c.downloaded);
     if (!list.length) {
       Alert.alert(t('md3.somethingWentWrong'), t('settingsStorage.cleanupSubtitle'));
@@ -380,9 +347,7 @@ export default function NovelDetailsScreen() {
     if (cancelledRef.current) return;
     setBulkDownloading(0);
     await reload();
-    // Selection mode stays active — rows now show "Offline" on the completed
-    // chapters so the user sees the result.  They can keep selecting,
-    // or exit with the X / Android back / hardware back.
+    // Selection stays active so rows show "Offline" on the completed chapters.
     Alert.alert(
       t('reader.downloadFailed'),
       failed ? `${t('selection.selected', { count: ok, plural: ok === 1 ? '' : 's' })}, ${t('selection.selected', { count: failed, plural: failed === 1 ? '' : 's' })} ${t('md3.tryAgain').toLowerCase()}.` : `${ok} ${t('chapterManage.chapterNumber').toLowerCase()}${ok === 1 ? '' : 's'} ${t('selection.download').toLowerCase()}.`,
@@ -500,11 +465,7 @@ export default function NovelDetailsScreen() {
 
   const keyExtractor = useCallback((item) => item.id, []);
 
-  // VirtualizedList estimates cells that are not yet mounted from getItemLayout
-  // and compares those offsets against the raw scroll offset, which already
-  // includes the (variable-height) ListHeaderComponent. The item offsets here
-  // must therefore include the header's measured height too, or the render
-  // window would be misplaced while scrolling quickly through a huge list.
+  // getItemLayout offsets must include the measured ListHeader height to place the render window correctly.
   const headerHeightRef = useRef(0);
   const onHeaderLayout = useCallback((e) => {
     headerHeightRef.current = e.nativeEvent.layout.height;

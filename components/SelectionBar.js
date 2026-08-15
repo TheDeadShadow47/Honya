@@ -20,10 +20,7 @@ function Act({ icon, label, onPress, disabled }) {
   );
 }
 
-/**
- * Contextual app bar for chapter multi-select. Overlays the screen top so the
- * chapter list underneath is never remounted when selection mode toggles.
- */
+// Contextual app bar for chapter multi-select, overlaying the list without remounting it.
 function SelectionBar({
   count,
   total,
@@ -77,10 +74,7 @@ function SelectionBar({
         <Text style={{ color: theme.textMuted, fontSize: 12, marginRight: 8 }}>{t('selection.ofN', { count: total, plural: total === 1 ? '' : 's' })}</Text>
       </View>
 
-      {/* Selection is always entered via long-press, so an anchor is always
-          set. "Select all except this" is therefore available immediately.
-          "Select all in between" only appears once exactly two chapters are
-          selected — the two tapped chapters define the range. */}
+      {/* Long-press always sets an anchor, so "except this" is always available; "in between" needs two. */}
       {hasAnchor ? (
         <View style={[styles.twoPoint, { borderTopColor: theme.outline }]}>
           <Act icon="remove-circle-outline" label={t('selection.selectAllExcept')} onPress={onSelectAllExcept} />

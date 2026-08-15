@@ -9,12 +9,7 @@ import Ripple from './Ripple';
 /** Fixed row height so the list can use getItemLayout on huge novels. */
 export const CHAPTER_ROW_HEIGHT = 68;
 
-/**
- * Single chapter row.
- *
- * Memoised and driven by *stable* callbacks that receive the chapter, so
- * selecting one chapter re-renders exactly one row instead of the whole list.
- */
+// Memoised row driven by stable callbacks so selecting re-renders only this row.
 const ChapterRow = memo(function ChapterRow({
   chapter,
   onPress,
@@ -58,9 +53,7 @@ const ChapterRow = memo(function ChapterRow({
   return (
     <Ripple onPress={handlePress} onLongPress={handleLongPress} delayLongPress={220}>
       <View style={[styles.row, selected ? { backgroundColor: alpha(theme.primary, 0.14) } : null]}>
-        {/* No checkboxes: selection state is conveyed by the row's tinted
-            background (applied below). The read/unread dot stays identical in
-            and out of selection mode so the list keeps its clean look. */}
+        {/* No checkboxes: selection is conveyed by the row's tinted background. */}
         <View style={styles.lead}>
           <View
             style={[

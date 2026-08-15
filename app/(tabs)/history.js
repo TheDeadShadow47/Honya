@@ -11,13 +11,7 @@ import { setPendingReader } from '../../lib/readerContext';
 import { Button, EmptyState, Field, IconButton, ListHeading, ScreenHeader } from '../../components/MD3';
 import { groupByDay } from '../../lib/time';
 
-/**
- * Reading history.
- *
- * Everything here is derived from the existing chapters table, so resuming a
- * chapter simply pushes the normal reader route — the reader restores scroll
- * position from the chapter's stored progress exactly as it does elsewhere.
- */
+// Reading history, derived from the chapters table; resuming just pushes the normal reader route.
 export default function HistoryScreen() {
   const theme = useAppTheme();
   const router = useRouter();
