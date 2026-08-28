@@ -112,6 +112,20 @@ export default function MoreScreen() {
       <SectionLabel>{t('more.application').toUpperCase()}</SectionLabel>
       <Group>
         <Row
+          icon="download-outline"
+          title={t('downloads.title')}
+          subtitle={t('more.downloadsSubtitle')}
+          onPress={() => router.push('/downloads')}
+        />
+        <Divider />
+        <Row
+          icon="notifications-outline"
+          title={t('more.notifications')}
+          subtitle={t('more.notificationsSubtitle')}
+          onPress={() => router.push('/settings/notifications')}
+        />
+        <Divider />
+        <Row
           icon="save-outline"
           title={t('more.storage')}
           subtitle={t('more.storageSubtitle')}

@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { useI18n } from '../hooks/useI18n';
-import { RADIUS, TOUCH } from '../theme/theme';
+import { RADIUS, TOUCH, alpha } from '../theme/theme';
 import Ripple from './Ripple';
 
 function Act({ icon, label, onPress, disabled }) {
@@ -20,9 +20,45 @@ function Act({ icon, label, onPress, disabled }) {
   );
 }
 
+// Labeled pill for the selection-scope tools (Select all / except / between).
+// These are the actions that define selection mode's whole point, so they get
+// text, not just an icon someone has to guess at.
+function Chip({ theme, icon, label, onPress, disabled }) {
+  return (
+    <View style={{ borderRadius: RADIUS.pill, overflow: 'hidden' }}>
+      <Ripple onPress={onPress} disabled={disabled} accessibilityLabel={label}>
+        <View
+          style={[
+            styles.chip,
+            { backgroundColor: disabled ? 'transparent' : alpha(theme.primary, 0.14) },
+          ]}
+        >
+          <Ionicons name={icon} size={15} color={disabled ? theme.textMuted : theme.primary} />
+          <Text
+            style={{
+              color: disabled ? theme.textMuted : theme.primary,
+              fontSize: 12.5,
+              fontWeight: '700',
+              marginLeft: 6,
+            }}
+          >
+            {label}
+          </Text>
+        </View>
+      </Ripple>
+    </View>
+  );
+}
+
 /**
  * Contextual app bar for chapter multi-select. Overlays the screen top so the
  * chapter list underneath is never remounted when selection mode toggles.
+ *
+ * Three rows, in order of what the user needs first:
+ *  1. Close + count — "you're selecting, N so far"
+ *  2. Selection-scope tools (select all / except / between) — available the
+ *     instant selection starts, not gated behind picking a second chapter
+ *  3. Bulk actions on the selection (download, mark read, etc.)
  */
 function SelectionBar({
   count,
@@ -34,12 +70,13 @@ function SelectionBar({
   onRemoveDownload,
   onMarkRead,
   onMarkUnread,
-  hasAnchor,
+  canDownload,
+  canRemoveDownload,
+  canMarkRead,
+  canMarkUnread,
   canSelectBetween,
   onSelectAllExcept,
   onSelectBetween,
-  downloading = false,
-  downloadingCount = 0,
 }) {
   const theme = useAppTheme();
   const { t } = useI18n();
@@ -61,35 +98,27 @@ function SelectionBar({
           </Ripple>
         </View>
         <Text style={{ color: theme.text, fontWeight: '800', fontSize: 16, flex: 1, marginLeft: 6 }}>
-          {downloading
-            ? t('selection.downloading', { count: downloadingCount })
-            : t('selection.selected', { count })}
+          {t('selection.selected', { count })}
         </Text>
-        <Act icon="checkmark-done-outline" label={t('selection.selectAll')} onPress={onToggleAll} />
+        <Text style={{ color: theme.textMuted, fontSize: 12 }}>{t('selection.ofN', { count: total, plural: total === 1 ? '' : 's' })}</Text>
+      </View>
+
+      {/* Available the moment selection starts — a single selected chapter is
+          all "select all except" needs, no second pick required. */}
+      <View style={[styles.tools, { borderTopColor: theme.outline }]}>
+        <Chip theme={theme} icon="checkmark-done-outline" label={t('selection.selectAll')} onPress={onToggleAll} />
+        <Chip theme={theme} icon="remove-circle-outline" label={t('selection.selectAllExcept')} onPress={onSelectAllExcept} />
+        {canSelectBetween ? (
+          <Chip theme={theme} icon="git-commit-outline" label={t('selection.selectBetween')} onPress={onSelectBetween} />
+        ) : null}
       </View>
 
       <View style={[styles.actions, { borderTopColor: theme.outline }]}>
-        <Act icon="arrow-down-circle-outline" label={t('selection.download')} onPress={onDownload} disabled={none || downloading} />
-        <Act icon="trash-outline" label={t('selection.removeDownload')} onPress={onRemoveDownload} disabled={none} />
-        <Act icon="eye-outline" label={t('selection.markRead')} onPress={onMarkRead} disabled={none} />
-        <Act icon="eye-off-outline" label={t('selection.markUnread')} onPress={onMarkUnread} disabled={none} />
-        <View style={{ flex: 1 }} />
-        <Text style={{ color: theme.textMuted, fontSize: 12, marginRight: 8 }}>{t('selection.ofN', { count: total, plural: total === 1 ? '' : 's' })}</Text>
+        <Act icon="arrow-down-circle-outline" label={t('selection.download')} onPress={onDownload} disabled={none || !canDownload} />
+        <Act icon="trash-outline" label={t('selection.removeDownload')} onPress={onRemoveDownload} disabled={none || !canRemoveDownload} />
+        <Act icon="eye-outline" label={t('selection.markRead')} onPress={onMarkRead} disabled={none || !canMarkRead} />
+        <Act icon="eye-off-outline" label={t('selection.markUnread')} onPress={onMarkUnread} disabled={none || !canMarkUnread} />
       </View>
-
-      {/* Selection is always entered via long-press, so an anchor is always
-          set. "Select all except this" is therefore available immediately.
-          "Select all in between" only appears once exactly two chapters are
-          selected — the two tapped chapters define the range. */}
-      {hasAnchor ? (
-        <View style={[styles.twoPoint, { borderTopColor: theme.outline }]}>
-          <Act icon="remove-circle-outline" label={t('selection.selectAllExcept')} onPress={onSelectAllExcept} />
-          {canSelectBetween ? (
-            <Act icon="git-commit-outline" label={t('selection.selectBetween')} onPress={onSelectBetween} />
-          ) : null}
-          <View style={{ flex: 1 }} />
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -97,8 +126,17 @@ function SelectionBar({
 const styles = StyleSheet.create({
   bar: { position: 'absolute', top: 0, left: 0, right: 0, borderBottomWidth: 1, elevation: 4, zIndex: 10 },
   top: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingBottom: 2 },
+  tools: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+  },
+  chip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, height: 32, borderRadius: RADIUS.pill },
   actions: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2, borderTopWidth: 1 },
-  twoPoint: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2, borderTopWidth: 1 },
   act: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
 });
 

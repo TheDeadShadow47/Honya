@@ -5,7 +5,7 @@ import { useAppTheme } from '../../hooks/useAppTheme';
 import { useI18n } from '../../hooks/useI18n';
 import { useStore } from '../../store/useStore';
 import { Button, SectionLabel, Surface } from '../../components/MD3';
-import { clearDownloads, getStorageStats } from '../../db/database';
+import { getStorageStats } from '../../db/database';
 
 function Stat({ label, value }) {
   const theme = useAppTheme();
@@ -22,6 +22,7 @@ export default function StorageScreen() {
   const { t } = useI18n();
   const [stats, setStats] = useState({ novels: 0, chapters: 0, downloaded: 0, plugins: 0 });
   const refreshLibrary = useStore((s) => s.refreshLibrary);
+  const clearAllDownloads = useStore((s) => s.clearAllDownloads);
 
   const load = useCallback(async () => setStats(await getStorageStats()), []);
   useFocusEffect(
@@ -55,7 +56,7 @@ export default function StorageScreen() {
                 text: t('settingsStorage.delete'),
                 style: 'destructive',
                 onPress: async () => {
-                  await clearDownloads();
+                  await clearAllDownloads();
                   await refreshLibrary();
                   await load();
                 },

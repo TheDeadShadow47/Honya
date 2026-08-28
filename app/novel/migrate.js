@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
 import { useAppTheme } from '../../hooks/useAppTheme';
+import { useI18n } from '../../hooks/useI18n';
 import { migrateNovel } from '../../lib/migrate';
 import { decodeNavParam } from '../../lib/navIds';
 import * as db from '../../db/database';
@@ -18,6 +19,7 @@ export default function MigrateScreen() {
   const sourceId = decodeNavParam(id);
   const theme = useAppTheme();
   const router = useRouter();
+  const { t } = useI18n();
 
   const installedExtensions = useStore((s) => s.installedExtensions);
   const globalSearch = useStore((s) => s.globalSearch);
@@ -82,23 +84,23 @@ export default function MigrateScreen() {
   const onPick = useCallback(
     (item) => {
       Alert.alert(
-        'Migrate novel',
-        `Move "${source?.title}" to ${item.sourceName}?\n\nRead progress and downloads are kept for chapters that match by name. The original source entry will be removed.`,
+        t('migrate.title'),
+        t('migrate.confirm', { title: source?.title, source: item.sourceName }),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('migrate.cancel'), style: 'cancel' },
           {
-            text: 'Migrate',
+            text: t('migrate.action'),
             onPress: async () => {
               setMigratingId(item.id);
               try {
                 await migrateNovel(source, item, installedExtensions);
                 await refreshLibrary();
                 await refreshUpdates();
-                Alert.alert('Migration complete', `This novel now comes from ${item.sourceName}.`, [
-                  { text: 'OK', onPress: () => router.back() },
+                Alert.alert(t('migrate.completeTitle'), t('migrate.completeMsg', { source: item.sourceName }), [
+                  { text: t('migrate.ok'), onPress: () => router.back() },
                 ]);
               } catch (e) {
-                Alert.alert('Migration failed', e.message);
+                Alert.alert(t('migrate.failedTitle'), e.message);
               } finally {
                 setMigratingId(null);
               }
@@ -107,7 +109,7 @@ export default function MigrateScreen() {
         ],
       );
     },
-    [source, installedExtensions, refreshLibrary, refreshUpdates, router],
+    [source, installedExtensions, refreshLibrary, refreshUpdates, router, t],
   );
 
   return (
@@ -125,7 +127,7 @@ export default function MigrateScreen() {
             setSearching(false);
           }}
           onSubmit={() => runSearch(query)}
-          placeholder={source ? `Search other sources for "${source.title}"` : 'Search other sources'}
+          placeholder={source ? t('migrate.searchPlaceholderTitle', { title: source.title }) : t('migrate.searchPlaceholder')}
         />
       </View>
 
@@ -135,7 +137,7 @@ export default function MigrateScreen() {
         </View>
       ) : searching ? (
         <Text style={{ color: theme.textMuted, fontSize: 12.5, paddingHorizontal: 16, paddingBottom: 10 }}>
-          Searching all installed sources…
+          {t('migrate.searching')}
         </Text>
       ) : hasSearched ? (
         <FlatList
@@ -184,17 +186,16 @@ export default function MigrateScreen() {
           ListEmptyComponent={
             <EmptyState
               icon="search-outline"
-              title="No matches on other sources"
-              subtitle={`Nothing matched "${query.trim()}" on another installed source. Try a different title.`}
-              action={<Button label="Search again" variant="tonal" onPress={() => runSearch(query)} />}
+              title={t('migrate.emptyTitle')}
+              subtitle={t('migrate.emptySubtitle', { query: query.trim() })}
+              action={<Button label={t('migrate.searchAgain')} variant="tonal" onPress={() => runSearch(query)} />}
             />
           }
         />
       ) : (
         <View style={{ paddingHorizontal: 16 }}>
           <Text style={{ color: theme.textMuted, fontSize: 13, lineHeight: 19 }}>
-            Search every installed source to find this novel elsewhere. Choose a result to move your library entry,
-            read progress, and downloads to that source.
+            {t('migrate.intro')}
           </Text>
         </View>
       )}

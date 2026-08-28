@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
 import { useAppTheme } from '../../hooks/useAppTheme';
+import { useI18n } from '../../hooks/useI18n';
 import { loadPlugin, pluginApi } from '../../lib/pluginEngine';
 import { decodeNavParam } from '../../lib/navIds';
 import { upsertNovel } from '../../db/database';
@@ -19,6 +20,7 @@ export default function BrowsePluginScreen() {
   const theme = useAppTheme();
   const router = useRouter();
   const navigation = useNavigation();
+  const { t } = useI18n();
   const { width } = useWindowDimensions();
   const record = useStore((s) => s.installedExtensions[id]);
   const columns = useStore((s) => s.prefs.gridColumns);
@@ -41,8 +43,8 @@ export default function BrowsePluginScreen() {
   }, [record]);
 
   useEffect(() => {
-    navigation.setOptions({ title: record?.name ?? 'Browse' });
-  }, [navigation, record?.name]);
+    navigation.setOptions({ title: record?.name ?? t('browse.title') });
+  }, [navigation, record?.name, t]);
 
   const load = useCallback(
     async (nextPage, replace) => {
@@ -85,9 +87,9 @@ export default function BrowsePluginScreen() {
     return (
       <EmptyState
         icon="apps-outline"
-        title="Extension not installed"
-        subtitle="This source is no longer installed. Reinstall it from More › Extensions."
-        action={<Button label="Open extensions" onPress={() => router.push('/settings/extensions')} />}
+        title={t('browse.notInstalledTitle')}
+        subtitle={t('browse.notInstalledSubtitle')}
+        action={<Button label={t('browse.openExtensions')} onPress={() => router.push('/settings/extensions')} />}
       />
     );
   }
@@ -98,21 +100,21 @@ export default function BrowsePluginScreen() {
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <View style={{ paddingHorizontal: PADDING, paddingTop: 12, gap: 10 }}>
         <View style={{ flexDirection: 'row' }}>
-          <Chip label="Popular" selected={mode === 'popular'} onPress={() => setMode('popular')} />
-          <Chip label="Latest" selected={mode === 'latest'} onPress={() => setMode('latest')} />
-          <Chip label="Search" selected={mode === 'search'} onPress={() => setMode('search')} />
+          <Chip label={t('browse.modePopular')} selected={mode === 'popular'} onPress={() => setMode('popular')} />
+          <Chip label={t('browse.modeLatest')} selected={mode === 'latest'} onPress={() => setMode('latest')} />
+          <Chip label={t('browse.modeSearch')} selected={mode === 'search'} onPress={() => setMode('search')} />
         </View>
         {mode === 'search' ? (
           <Field
             value={query}
             onChangeText={setQuery}
-            placeholder="Search this source"
+            placeholder={t('browse.searchPlaceholder')}
             returnKeyType="search"
             onSubmitEditing={() => load(1, true)}
           />
         ) : null}
         {mode === 'search' ? (
-          <Button label="Search" icon={<Ionicons name="search" size={15} color={theme.onPrimary} />} onPress={() => load(1, true)} />
+          <Button label={t('browse.searchAction')} icon={<Ionicons name="search" size={15} color={theme.onPrimary} />} onPress={() => load(1, true)} />
         ) : null}
         {error ? <Text style={{ color: theme.error, fontSize: 12.5 }}>{error}</Text> : null}
       </View>
@@ -129,7 +131,7 @@ export default function BrowsePluginScreen() {
         onEndReached={() => !loading && mode !== 'search' && load(page + 1, false)}
         ListFooterComponent={loading ? <ActivityIndicator color={theme.primary} style={{ marginTop: 16 }} /> : null}
         ListEmptyComponent={
-          loading ? null : <EmptyState title="Nothing to show" subtitle="This source returned no results." />
+          loading ? null : <EmptyState title={t('browse.emptyTitle')} subtitle={t('browse.emptySubtitle')} />
         }
       />
     </View>

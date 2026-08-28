@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, BackHandler, FlatList, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from '../../store/useStore';
 import { useAppTheme } from '../../hooks/useAppTheme';
@@ -14,13 +14,13 @@ import ChapterManageSheet from '../../components/ChapterManageSheet';
 import { getCachedChapterPrefs, loadChapterPrefs, saveChapterPrefs } from '../../lib/chapterPrefs';
 import NovelHeader from '../../components/NovelHeader';
 import SelectionBar from '../../components/SelectionBar';
+import { markFetched, shouldFetch } from '../../lib/novelFetchThrottle';
+import { showToast } from '../../lib/toast';
 
 const DEFAULT_FILTERS = { downloaded: false, unread: false };
 const DEFAULT_DISPLAY = { sourceTitle: false, chapterNumber: false };
 
 // Throttle auto-refetch per novel so rapid open → back → open doesn't hit the network; manual refresh bypasses it.
-const FETCH_THROTTLE_MS = 10 * 60 * 1000;
-const lastFetchedAt = new Map();
 
 export default function NovelDetailsScreen() {
   const { id } = useLocalSearchParams();
@@ -33,7 +33,6 @@ export default function NovelDetailsScreen() {
   const installedExtensions = useStore((s) => s.installedExtensions);
   const toggleLibrary = useStore((s) => s.toggleLibrary);
   const refreshUpdates = useStore((s) => s.refreshUpdates);
-  const downloadStates = useStore((s) => s.downloadStates);
   const downloadChapter = useStore((s) => s.downloadChapter);
   const downloadMany = useStore((s) => s.downloadMany);
   const removeDownload = useStore((s) => s.removeDownload);
@@ -51,7 +50,6 @@ export default function NovelDetailsScreen() {
   const [display, setDisplay] = useState(initialPrefs?.display ?? DEFAULT_DISPLAY);
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
-  const [anchorId, setAnchorId] = useState(null);
 
   // Last-persisted snapshot, seeded from the restored state; only written to AsyncStorage when settings actually change.
   const savedPrefsRef = useRef(
@@ -69,9 +67,6 @@ export default function NovelDetailsScreen() {
     savedPrefsRef.current = json;
     saveChapterPrefs(novelId, next);
   }, [filters, sortKey, display, novelId]);
-
-  // Chapters queued by the current bulk download; 0 while idle, drives the toolbar's aggregate progress.
-  const [bulkDownloading, setBulkDownloading] = useState(0);
 
   // Refresh spinner; the ref guard prevents a second request while one is in flight.
   const [refreshing, setRefreshing] = useState(false);
@@ -124,7 +119,7 @@ export default function NovelDetailsScreen() {
         if (cancelledRef.current) return;
         await reload();
         await refreshUpdates();
-        lastFetchedAt.set(novelId, Date.now());
+        markFetched(novelId);
       } catch (e) {
         if (!cancelledRef.current) Alert.alert(t('novel.couldNotLoad'), e.message);
       }
@@ -153,7 +148,7 @@ export default function NovelDetailsScreen() {
       setChapters(list);
       setChaptersLoaded(true);
       // Skip the network round-trip within the throttle window so rapid open → back → open doesn't re-clog the DB queue.
-      if (base && Date.now() - (lastFetchedAt.get(novelId) ?? 0) > FETCH_THROTTLE_MS) {
+      if (base && shouldFetch(novelId)) {
         fetchRemote(base);
       }
     })();
@@ -162,6 +157,18 @@ export default function NovelDetailsScreen() {
       cancelledRef.current = true;
     };
   }, [novelId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reload chapters when the screen regains focus (e.g. returning from the
+  // reader after marking chapters as read). Without this the in-memory chapter
+  // list is stale and the unread filter shows incorrect results.
+  useFocusEffect(
+    useCallback(() => {
+      if (!novelId || !chaptersLoaded) return;
+      db.getChapters(novelId).then((list) => {
+        if (!cancelledRef.current) setChapters(list);
+      }).catch(() => {});
+    }, [novelId, chaptersLoaded]),
+  );
 
   /* ---------- derived chapter data (computed once per input change) ---------- */
 
@@ -202,13 +209,37 @@ export default function NovelDetailsScreen() {
   const manageActive = filtersActive || sortKey !== 'numberAsc' || display.sourceTitle || display.chapterNumber;
   const sourceName = novel?.pluginId ? installedExtensions[novel.pluginId]?.name : undefined;
 
+  // Lookup for O(selection size) instead of O(chapter count) below — matters on
+  // novels with thousands of chapters where only a handful are ever selected.
+  const chaptersById = useMemo(() => {
+    const map = new Map();
+    for (const c of chapters) map.set(c.id, c);
+    return map;
+  }, [chapters]);
+
+  // Which bulk actions actually apply to the current selection — e.g. "Remove
+  // download" only makes sense if at least one selected chapter is downloaded.
+  const selectionFlags = useMemo(() => {
+    let canDownload = false;
+    let canRemoveDownload = false;
+    let canMarkRead = false;
+    let canMarkUnread = false;
+    for (const id of selectedIds) {
+      const c = chaptersById.get(id);
+      if (!c) continue;
+      if (c.downloaded) canRemoveDownload = true;
+      else canDownload = true;
+      if (c.read) canMarkUnread = true;
+      else canMarkRead = true;
+    }
+    return { canDownload, canRemoveDownload, canMarkRead, canMarkUnread };
+  }, [chaptersById, selectedIds]);
+
   /* ---------- selection ---------- */
 
   const exitSelect = useCallback(() => {
     setSelecting(false);
     setSelectedIds(new Set());
-    setAnchorId(null);
-    setBulkDownloading(0);
   }, []);
 
   const toggleSelect = useCallback((chapterId) => {
@@ -234,8 +265,6 @@ export default function NovelDetailsScreen() {
   visibleRef.current = visibleChapters;
   const selectedRef = useRef(selectedIds);
   selectedRef.current = selectedIds;
-  const anchorIdRef = useRef(anchorId);
-  anchorIdRef.current = anchorId;
 
   const toggleAll = useCallback(() => {
     setSelectedIds((prev) =>
@@ -250,10 +279,12 @@ export default function NovelDetailsScreen() {
 
   /* ---------- one-tap range actions ---------- */
 
-  // Operates on the *displayed* order (filters + sort applied) and only expands the selection; the anchor stays so "except this" can be re-framed.
+  // Selects every displayed chapter that ISN'T already selected — with 1 chapter
+  // selected that's "all except this one"; with several it's "all except selected".
+  // No separate anchor needed: the current selection itself is the exclusion set.
   const selectAllExcept = useCallback(() => {
-    const next = new Set(visibleRef.current.map((c) => c.id));
-    next.delete(anchorIdRef.current);
+    const excluded = selectedRef.current;
+    const next = new Set(visibleRef.current.filter((c) => !excluded.has(c.id)).map((c) => c.id));
     setSelectedIds(next);
   }, []);
 
@@ -291,12 +322,19 @@ export default function NovelDetailsScreen() {
     [router, toggleSelect],
   );
 
-  // Long-press enters selection with that chapter as anchor and sole selection; a later long-press re-anchors.
-  const longPressChapter = useCallback((chapter) => {
-    if (!selectingRef.current) setSelecting(true);
-    setAnchorId(chapter.id);
-    setSelectedIds(new Set([chapter.id]));
-  }, []);
+  // Long-press enters selection with that chapter selected; while already selecting,
+  // it just toggles that chapter — selection tools work off the whole set from here.
+  const longPressChapter = useCallback(
+    (chapter) => {
+      if (!selectingRef.current) {
+        setSelecting(true);
+        setSelectedIds(new Set([chapter.id]));
+      } else {
+        toggleSelect(chapter.id);
+      }
+    },
+    [toggleSelect],
+  );
 
   const onDownloadChapter = useCallback(
     async (chapter) => {
@@ -329,30 +367,21 @@ export default function NovelDetailsScreen() {
 
   /* ---------- bulk actions (existing functionality only) ---------- */
 
-  // Re-entry guard: don't start a second bulk download while one is in flight.
-  const bulkDownloadingRef = useRef(bulkDownloading);
-  bulkDownloadingRef.current = bulkDownloading;
-
   const bulkDownload = useCallback(async () => {
-    if (bulkDownloadingRef.current > 0) return;
-    // Skip already-downloaded chapters so the concurrency slots go to what's actually missing.
+    // Skip already-downloaded chapters so the queue only gets what's actually missing.
     const list = selectedChapters().filter((c) => !c.downloaded);
     if (!list.length) {
       Alert.alert(t('md3.somethingWentWrong'), t('settingsStorage.cleanupSubtitle'));
       return;
     }
-    setBulkDownloading(list.length);
-    const { ok, failed } = await downloadMany(list);
-    // Bail if the screen was unmounted while downloads were in flight.
+    const count = list.length;
+    // Selection exits right away — the queue (lib/downloadQueue.js) owns the operation from here.
+    // Each row's own spinner/clock icon (via downloadStates) shows real progress independently.
+    exitSelect();
+    await downloadMany(list);
     if (cancelledRef.current) return;
-    setBulkDownloading(0);
-    await reload();
-    // Selection mode stays active so rows now show "Offline" on completed chapters; exit with X / back.
-    Alert.alert(
-      t('reader.downloadFailed'),
-      failed ? `${t('selection.selected', { count: ok, plural: ok === 1 ? '' : 's' })}, ${t('selection.selected', { count: failed, plural: failed === 1 ? '' : 's' })} ${t('md3.tryAgain').toLowerCase()}.` : `${ok} ${t('chapterManage.chapterNumber').toLowerCase()}${ok === 1 ? '' : 's'} ${t('selection.download').toLowerCase()}.`,
-    );
-  }, [selectedChapters, downloadMany, reload, t]);
+    showToast(t('selection.addedToDownloads', { count, plural: count === 1 ? '' : 's' }));
+  }, [selectedChapters, downloadMany, exitSelect, t]);
 
   const bulkRemoveDownload = useCallback(() => {
     const list = selectedChapters().filter((c) => c.downloaded);
@@ -437,7 +466,6 @@ export default function NovelDetailsScreen() {
     ({ item }) => (
       <ChapterRow
         chapter={item}
-        downloadState={downloadStates[item.id]}
         selecting={selecting}
         selected={selectedIds.has(item.id)}
         onPress={openChapter}
@@ -450,7 +478,6 @@ export default function NovelDetailsScreen() {
       />
     ),
     [
-      downloadStates,
       selecting,
       selectedIds,
       openChapter,
@@ -554,12 +581,13 @@ export default function NovelDetailsScreen() {
           onRemoveDownload={bulkRemoveDownload}
           onMarkRead={markRead}
           onMarkUnread={markUnread}
-          hasAnchor={!!anchorId}
+          canDownload={selectionFlags.canDownload}
+          canRemoveDownload={selectionFlags.canRemoveDownload}
+          canMarkRead={selectionFlags.canMarkRead}
+          canMarkUnread={selectionFlags.canMarkUnread}
           canSelectBetween={selectedIds.size === 2}
           onSelectAllExcept={selectAllExcept}
           onSelectBetween={selectBetween}
-          downloading={bulkDownloading > 0}
-          downloadingCount={bulkDownloading}
         />
       ) : null}
 

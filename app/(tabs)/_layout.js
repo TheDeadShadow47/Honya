@@ -4,6 +4,7 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../hooks/useAppTheme';
+import { useStore } from '../../store/useStore';
 import { RADIUS } from '../../theme/theme';
 import { useI18n } from '../../hooks/useI18n';
 
@@ -16,7 +17,7 @@ const ICONS = {
   more: ['menu', 'menu-outline'],
 };
 
-function TabItem({ routeName, focused, theme }) {
+function TabItem({ routeName, focused, theme, badge }) {
   const [active, inactive] = ICONS[routeName] ?? ICONS.more;
   return (
     <View style={{ alignItems: 'center', justifyContent: 'center', width: 64 }}>
@@ -30,11 +31,26 @@ function TabItem({ routeName, focused, theme }) {
           backgroundColor: focused ? theme.primaryContainer : 'transparent',
         }}
       >
-        <Ionicons
-          name={focused ? active : inactive}
-          size={21}
-          color={focused ? theme.onPrimaryContainer : theme.textMuted}
-        />
+        <View>
+          <Ionicons
+            name={focused ? active : inactive}
+            size={21}
+            color={focused ? theme.onPrimaryContainer : theme.textMuted}
+          />
+          {badge ? (
+            <View
+              style={{
+                position: 'absolute',
+                top: -2,
+                right: -4,
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: theme.primary,
+              }}
+            />
+          ) : null}
+        </View>
       </View>
     </View>
   );
@@ -44,6 +60,7 @@ export default function TabsLayout() {
   const theme = useAppTheme();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
+  const hasAppUpdate = useStore((s) => !!(s.appUpdateState.latestRelease || s.appUpdateState.downloadedVersion));
 
   return (
     <Tabs
@@ -62,7 +79,14 @@ export default function TabsLayout() {
           elevation: 0,
         },
         tabBarHideOnKeyboard: true,
-        tabBarIcon: ({ focused }) => <TabItem routeName={route.name} focused={focused} theme={theme} />,
+        tabBarIcon: ({ focused }) => (
+          <TabItem
+            routeName={route.name}
+            focused={focused}
+            theme={theme}
+            badge={route.name === 'more' && hasAppUpdate}
+          />
+        ),
         tabBarLabel: ({ focused, color, children }) => (
           <Text style={{ color, fontSize: 11, fontWeight: focused ? '800' : '600' }} numberOfLines={1}>
             {children}

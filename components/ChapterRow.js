@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { useI18n } from '../hooks/useI18n';
+import { useStore } from '../store/useStore';
 import { alpha, RADIUS } from '../theme/theme';
 import Ripple from './Ripple';
 
@@ -33,6 +34,7 @@ const ChapterRow = memo(function ChapterRow({
   const { t } = useI18n();
   const read = !!chapter.read;
   const downloading = downloadState === 'downloading';
+  const queued = downloadState === 'queued';
   const failed = downloadState === 'failed';
   const downloaded = !!chapter.downloaded;
   const progress = chapter.progress ?? 0;
@@ -50,17 +52,14 @@ const ChapterRow = memo(function ChapterRow({
   const handlePress = useCallback(() => onPress?.(chapter), [onPress, chapter]);
   const handleLongPress = useCallback(() => onLongPress?.(chapter), [onLongPress, chapter]);
   const handleDownload = useCallback(() => {
-    if (downloading) return;
+    if (downloading || queued) return;
     if (downloaded) onRemoveDownload?.(chapter);
     else onDownload?.(chapter);
-  }, [downloading, downloaded, onRemoveDownload, onDownload, chapter]);
+  }, [downloading, queued, downloaded, onRemoveDownload, onDownload, chapter]);
 
   return (
     <Ripple onPress={handlePress} onLongPress={handleLongPress} delayLongPress={220}>
-      <View style={[styles.row, selected ? { backgroundColor: alpha(theme.primary, 0.14) } : null]}>
-        {/* No checkboxes: selection state is conveyed by the row's tinted
-            background (applied below). The read/unread dot stays identical in
-            and out of selection mode so the list keeps its clean look. */}
+      <View style={[styles.row, selected ? { backgroundColor: alpha(theme.primary, 0.2) } : null]}>
         <View style={styles.lead}>
           <View
             style={[
@@ -105,10 +104,12 @@ const ChapterRow = memo(function ChapterRow({
 
         {selecting ? null : (
           <View style={styles.actionWrap}>
-            <Ripple borderless disabled={downloading} hitSlop={6} onPress={handleDownload} accessibilityLabel={t('chapter.download')}>
+            <Ripple borderless disabled={downloading || queued} hitSlop={6} onPress={handleDownload} accessibilityLabel={t('chapter.download')}>
               <View style={styles.downloadButton}>
                 {downloading ? (
                   <ActivityIndicator size="small" color={theme.primary} />
+                ) : queued ? (
+                  <Ionicons name="time-outline" size={19} color={theme.textMuted} />
                 ) : (
                   <Ionicons
                     name={downloaded ? 'checkmark-circle' : failed ? 'cloud-offline-outline' : 'arrow-down-circle-outline'}
@@ -140,4 +141,16 @@ const styles = StyleSheet.create({
   downloadButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 });
 
-export default ChapterRow;
+/**
+ * Store-connected row. Reads only this chapter's download state from the
+ * global store, so a bulk download advancing chapter N re-renders exactly that
+ * one row (not the whole list). The screen passes no downloadState prop — it
+ * no longer needs to subscribe to every chapter's download progress.
+ */
+const ChapterRowBound = memo(function ChapterRowBound({ chapter, ...rest }) {
+  const downloadState = useStore((s) => (s.downloadStates ? s.downloadStates[chapter.id] : undefined));
+  return <ChapterRow {...rest} chapter={chapter} downloadState={downloadState} />;
+});
+
+export { ChapterRow as ChapterRowBase, ChapterRowBound as ConnectedChapterRow };
+export default ChapterRowBound;

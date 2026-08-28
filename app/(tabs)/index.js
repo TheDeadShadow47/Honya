@@ -6,6 +6,7 @@ import { useStore } from '../../store/useStore';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useI18n } from '../../hooks/useI18n';
 import NovelCard from '../../components/NovelCard';
+import ContinueReading from '../../components/ContinueReading';
 import { Button, EmptyState, Field, IconButton, ScreenHeader } from '../../components/MD3';
 
 const GAP = 12;
@@ -18,9 +19,11 @@ export default function LibraryScreen() {
   const { width } = useWindowDimensions();
   const { t } = useI18n();
   const library = useStore((s) => s.library);
+  const history = useStore((s) => s.history);
   const columns = useStore((s) => s.prefs.gridColumns);
   const setPref = useStore((s) => s.setPref);
   const refreshLibrary = useStore((s) => s.refreshLibrary);
+  const refreshHistory = useStore((s) => s.refreshHistory);
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -28,7 +31,8 @@ export default function LibraryScreen() {
   useFocusEffect(
     useCallback(() => {
       refreshLibrary();
-    }, [refreshLibrary]),
+      refreshHistory();
+    }, [refreshLibrary, refreshHistory]),
   );
 
   const cardWidth = (width - PADDING * 2 - GAP * (columns - 1)) / columns;
@@ -39,6 +43,12 @@ export default function LibraryScreen() {
   }, [library, query]);
 
   const unread = useMemo(() => library.reduce((sum, n) => sum + (n.unread || 0), 0), [library]);
+
+  const continueEntry = useMemo(() => {
+    if (!history.length || !library.length) return null;
+    const libraryIds = new Set(library.map((n) => n.id));
+    return history.find((h) => libraryIds.has(h.novelId)) ?? null;
+  }, [history, library]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -59,7 +69,7 @@ export default function LibraryScreen() {
   }, []);
 
   const subtitle = library.length
-    ? t('library.withUnread', { count: library.length, plural: library.length === 1 ? '' : 's', unread })
+    ? t('library.withUnread', { count: library.length, plural: library.length === 1 ? '' : 's', unread, unreadPlural: unread === 1 ? '' : 's' })
     : t('library.empty');
 
   return (
@@ -106,6 +116,9 @@ export default function LibraryScreen() {
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} colors={[theme.primary]} />
+        }
+        ListHeaderComponent={
+          !searchOpen && continueEntry ? <ContinueReading entry={continueEntry} /> : null
         }
         ListEmptyComponent={
           <EmptyState

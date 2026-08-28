@@ -3,12 +3,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as db from '../db/database';
 import { fetchRepository, fetchPluginCode } from '../lib/repository';
 import { loadPlugin, pluginApi, unloadPlugin } from '../lib/pluginEngine';
-import { sanitizeChapter } from '../lib/clean';
 import { loadChapterPrefs, getChapterPrefsSnapshot, restoreChapterPrefsSnapshot, CHAPTER_PREFS_KEY } from '../lib/chapterPrefs';
 import { setLanguage, applyDirection } from '../lib/i18n';
 import * as backup from '../lib/backup';
-
-const DOWNLOAD_CONCURRENCY = 3;
+import * as downloadQueue from '../lib/downloadQueue';
+import * as libraryUpdate from '../lib/libraryUpdate';
+import * as updateManager from '../lib/updateManager';
 
 const PREFS_KEY = '@honya/prefs';
 const REPOS_KEY = '@honya/repos';
@@ -47,6 +47,17 @@ export const DEFAULT_PREFS = {
   horizontalPadding: 20,
   gridColumns: 3,
   markReadOnOpen: false,
+  notificationsEnabled: true,
+  notificationsUpdates: true,
+  notificationsDownloads: true,
+  notifyDownloadStart: true,
+  notifyDownloadComplete: true,
+  notifyDownloadFailed: true,
+  notifyNewChaptersFound: true,
+  notifyUpdateComplete: true,
+  notifyUpdateFailed: true,
+  autoUpdateInterval: 'never', // 'never' | '6h' | '12h' | 'daily'
+  notificationPromptSeen: false, // has the first-launch notification permission prompt been resolved?
 };
 
 export const useStore = create((set, get) => ({
@@ -61,6 +72,10 @@ export const useStore = create((set, get) => ({
   updates: [],
   history: [],
   downloadStates: {},
+  downloadQueueState: { paused: false, downloading: [], queued: [], failed: [], completed: [], batchTotal: 0, batchDone: 0 },
+  updateProgress: { running: false, current: 0, total: 0, novelTitle: null },
+  updateSummary: { lastUpdateAt: null, checked: 0, updated: 0, newChapters: 0, failed: [] },
+  appUpdateState: updateManager.getState(),
 
   /* ---------- bootstrap ---------- */
   hydrate: async () => {
@@ -88,6 +103,33 @@ export const useStore = create((set, get) => ({
     await get().refreshLibrary();
     await get().refreshUpdates();
     await get().refreshHistory();
+
+    // Mirror the download queue / update engine's own state into the store so
+    // any screen can subscribe with plain useStore selectors.
+    downloadQueue.subscribe((snapshot) => {
+      set({ downloadQueueState: snapshot, downloadStates: snapshot.states });
+    });
+    await downloadQueue.initDownloadQueue();
+
+    libraryUpdate.subscribe(({ progress, summary }) => {
+      set((s) => ({
+        updateProgress: progress ?? s.updateProgress,
+        updateSummary: summary ?? s.updateSummary,
+      }));
+      if (summary) {
+        // A finished update almost certainly touched chapters/novels.
+        get().refreshLibrary();
+        get().refreshUpdates();
+      }
+    });
+    const savedSummary = await libraryUpdate.loadPersistedSummary();
+    if (savedSummary) set({ updateSummary: savedSummary });
+
+    // Subscribe to update manager state changes
+    updateManager.subscribe((appUpdateState) => {
+      set({ appUpdateState });
+    });
+    await updateManager.initUpdateManager();
   },
 
   /* preferences */
@@ -187,48 +229,37 @@ export const useStore = create((set, get) => ({
     return { results, errors };
   },
 
-  /* downloads */
+  /* downloads — all roads lead through the central queue (lib/downloadQueue.js).
+   * Concurrency is fixed at 1 worker there; nothing here downloads directly. */
   downloadChapter: async (chapter) => {
-    const id = chapter?.id;
-    if (!id) return;
-    if (get().downloadStates[id] === 'downloading') return;
-    set({ downloadStates: { ...get().downloadStates, [id]: 'downloading' } });
-    try {
-      const nv = await db.getNovel(chapter.novelId);
-      const record = nv?.pluginId ? get().installedExtensions[nv.pluginId] : null;
-      if (!record) throw new Error('The source extension for this novel is not installed');
-      const instance = loadPlugin(record);
-      const raw = await pluginApi.chapter(instance, chapter.path);
-      const clean = sanitizeChapter(raw, { title: chapter.name });
-      if (!clean) throw new Error('The source returned an empty chapter');
-      await db.saveChapterText(id, clean);
-      const next = { ...get().downloadStates };
-      delete next[id];
-      set({ downloadStates: next });
-    } catch (e) {
-      set({ downloadStates: { ...get().downloadStates, [id]: 'failed' } });
-      throw e;
-    }
+    if (!chapter?.id) return;
+    const novel = await db.getNovel(chapter.novelId);
+    await downloadQueue.enqueue([chapter], { novel });
   },
 
   downloadMany: async (chapters) => {
-    const queue = (Array.isArray(chapters) ? chapters : []).filter((c) => c && c.id && !c.downloaded);
-    let ok = 0;
-    let failed = 0;
-    const limit = Math.max(1, Math.min(DOWNLOAD_CONCURRENCY, queue.length));
-    const worker = async () => {
-      while (queue.length) {
-        const c = queue.shift();
-        try {
-          await get().downloadChapter(c);
-          ok += 1;
-        } catch {
-          failed += 1;
-        }
-      }
-    };
-    await Promise.all(Array.from({ length: limit }, worker));
-    return { ok, failed };
+    const list = (Array.isArray(chapters) ? chapters : []).filter((c) => c && c.id && !c.downloaded);
+    if (!list.length) return { queued: 0 };
+    const novelId = list[0]?.novelId;
+    const novel = novelId ? await db.getNovel(novelId) : null;
+    await downloadQueue.enqueue(list, { novel });
+    return { queued: list.length };
+  },
+
+  cancelDownload: (chapterId) => downloadQueue.cancel(chapterId),
+  cancelAllQueuedDownloads: () => downloadQueue.cancelAllQueued(),
+  pauseDownloadQueue: () => downloadQueue.pauseQueue(),
+  resumeDownloadQueue: () => downloadQueue.resumeQueue(),
+  retryFailedDownloads: () => downloadQueue.retryFailed(),
+  clearCompletedDownloads: () => downloadQueue.clearCompleted(),
+  clearFailedDownloads: () => downloadQueue.clearFailed(),
+
+  // Storage screen's "delete all downloads" — wipes chapter content AND the
+  // completed-queue history so the Downloads screen doesn't keep showing
+  // entries for content that was just deleted.
+  clearAllDownloads: async () => {
+    await db.clearDownloads();
+    await downloadQueue.clearCompleted();
   },
 
   removeDownload: async (chapterId) => {
@@ -237,6 +268,11 @@ export const useStore = create((set, get) => ({
     delete next[chapterId];
     set({ downloadStates: next });
   },
+
+  /* library updates — see lib/libraryUpdate.js. Guarded there so a manual
+   * update and the background one can never run concurrently. */
+  runLibraryUpdate: (opts) => libraryUpdate.runLibraryUpdate(opts),
+  cancelLibraryUpdate: () => libraryUpdate.cancelLibraryUpdate(),
 
   /* library  */
   refreshLibrary: async () => set({ library: await db.getLibrary() }),
@@ -263,6 +299,7 @@ export const useStore = create((set, get) => ({
   },
   removeFromLibraryHard: async (novelId) => {
     await db.deleteNovel(novelId);
+    await downloadQueue.removeByNovel(novelId);
     await get().refreshLibrary();
     await get().refreshUpdates();
     await get().refreshHistory();
@@ -316,6 +353,16 @@ export const useStore = create((set, get) => ({
 
     return parsed.meta;
   },
+
+  /* app update */
+  checkForAppUpdate: (opts) => updateManager.checkForUpdates(opts),
+  downloadAppUpdate: () => updateManager.downloadUpdate(),
+  cancelAppUpdateDownload: () => updateManager.cancelDownload(),
+  installAppUpdate: () => updateManager.installUpdate(),
+  skipAppUpdateVersion: () => updateManager.skipVersion(),
+  dismissAppUpdate: () => updateManager.dismissUpdate(),
+  checkWhatsNew: () => updateManager.checkWhatsNew(),
+  markWhatsNewSeen: () => updateManager.markWhatsNewSeen(),
 }));
 
 export const useTheme = () => useStore((s) => s.prefs.theme);

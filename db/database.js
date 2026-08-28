@@ -72,6 +72,16 @@ export function initDatabase() {
         installedAt INTEGER
       );
       CREATE INDEX IF NOT EXISTS idx_chapters_novel ON chapters(novelId);
+      CREATE TABLE IF NOT EXISTS downloads (
+        chapterId TEXT PRIMARY KEY NOT NULL,
+        novelId TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'queued',
+        queuePos INTEGER,
+        error TEXT,
+        createdAt INTEGER,
+        updatedAt INTEGER
+      );
+      CREATE INDEX IF NOT EXISTS idx_downloads_status ON downloads(status);
     `);
     await migrate(db);
     return db;
@@ -139,6 +149,7 @@ export function deleteNovel(novelId) {
     const db = await getDb();
     await db.runAsync('DELETE FROM chapters WHERE novelId = ?', [novelId]);
     await db.runAsync('DELETE FROM novels WHERE id = ?', [novelId]);
+    await db.runAsync('DELETE FROM downloads WHERE novelId = ?', [novelId]);
   });
 }
 
@@ -445,6 +456,13 @@ export function getPlugins() {
   });
 }
 
+export function getPlugin(id) {
+  return serialize(async () => {
+    const db = await getDb();
+    return db.getFirstAsync('SELECT * FROM plugins WHERE id = ?', [id]);
+  });
+}
+
 export function deletePlugin(id) {
   return serialize(async () => {
     const db = await getDb();
@@ -474,6 +492,67 @@ export function clearDownloads() {
   return serialize(async () => {
     const db = await getDb();
     await db.runAsync('UPDATE chapters SET downloadedText = NULL');
+    // Otherwise the Downloads screen would keep showing these as "Completed"
+    // after their actual content was just wiped.
+    await db.runAsync('DELETE FROM downloads WHERE status = ?', ['completed']);
+  });
+}
+
+/* ---------- download queue ----------
+ * Persists the download queue so it survives navigation, app close, and
+ * crashes. The worker (lib/downloadQueue.js) reconciles this table on boot.
+ */
+export function getDownloadQueue() {
+  return serialize(async () => {
+    const db = await getDb();
+    return db.getAllAsync(
+      `SELECT d.chapterId, d.novelId, d.status, d.queuePos, d.error, d.createdAt, d.updatedAt,
+              c.name AS chapterName, c.number AS chapterNumber,
+              n.title AS novelTitle, n.cover AS novelCover
+         FROM downloads d
+         JOIN chapters c ON c.id = d.chapterId
+         JOIN novels n ON n.id = d.novelId
+        ORDER BY d.queuePos ASC, d.createdAt ASC`,
+    );
+  });
+}
+
+export function upsertDownloadQueueItems(items) {
+  if (!items?.length) return Promise.resolve();
+  return serialize(async () => {
+    const db = await getDb();
+    await db.withTransactionAsync(async () => {
+      for (const it of items) {
+        await db.runAsync(
+          `INSERT INTO downloads (chapterId, novelId, status, queuePos, error, createdAt, updatedAt)
+           VALUES (?,?,?,?,?,?,?)
+           ON CONFLICT(chapterId) DO UPDATE SET
+             status=excluded.status, queuePos=excluded.queuePos, error=excluded.error, updatedAt=excluded.updatedAt`,
+          [
+            it.chapterId,
+            it.novelId,
+            it.status,
+            it.queuePos ?? null,
+            it.error ?? null,
+            it.createdAt ?? Date.now(),
+            it.updatedAt ?? Date.now(),
+          ],
+        );
+      }
+    });
+  });
+}
+
+export function removeDownloadQueueItems(chapterIds) {
+  const ids = (chapterIds ?? []).filter(Boolean);
+  if (!ids.length) return Promise.resolve();
+  return serialize(async () => {
+    const db = await getDb();
+    await db.withTransactionAsync(async () => {
+      for (const id of ids) {
+        await db.runAsync('DELETE FROM downloads WHERE chapterId = ?', [id]);
+      }
+    });
   });
 }
 

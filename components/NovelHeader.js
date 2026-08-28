@@ -186,11 +186,17 @@ function NovelHeader({
 
       <View style={styles.toolbar}>
         <Text style={{ color: theme.text, fontWeight: '800', fontSize: 15, flex: 1 }}>
-          {totalChapters} {t('chapter.chapters')}
-          {filtered ? ` · ${shownChapters} ${t('novel.shown')}` : ''}
+          {filtered
+            ? t('novel.filteredChapters', {
+                count: totalChapters,
+                plural: totalChapters === 1 ? '' : 's',
+                shown: shownChapters,
+                shownPlural: shownChapters === 1 ? '' : 's',
+              })
+            : t('novel.chapters', { count: totalChapters, plural: totalChapters === 1 ? '' : 's' })}
         </Text>
         <View style={{ borderRadius: RADIUS.pill, overflow: 'hidden' }}>
-          <Ripple onPress={onOpenManage} accessibilityLabel={t('novel.manageChapters')}>
+          <Ripple onPress={onOpenManage} accessibilityLabel={t('novel.manageA11y')}>
             <View
               style={[
                 styles.manageButton,

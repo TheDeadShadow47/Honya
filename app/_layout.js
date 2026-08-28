@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -10,6 +10,14 @@ import { isThemeDark } from '../theme/theme';
 import * as SplashScreen from 'expo-splash-screen';
 import { setLanguage, applyDirection, getLanguage, isRTL } from '../lib/i18n';
 import { useI18n } from '../hooks/useI18n';
+import { initNotifications, setRouterReference, removeNotificationListeners } from '../lib/notifications';
+import { registerBackgroundTasks } from '../lib/backgroundTasks';
+import { backgroundCheckForUpdate } from '../lib/updateManager';
+import { handleNotificationAction as handleDownloadAction } from '../lib/downloadQueue';
+import { handleNotificationAction as handleUpdateAction } from '../lib/libraryUpdate';
+import Toast from '../components/Toast';
+import WhatsNew from '../components/WhatsNew';
+import NotificationPermissionPrompt from '../components/NotificationPermissionPrompt';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -20,6 +28,12 @@ export default function RootLayout() {
   const theme = useAppTheme();
   const isDark = isThemeDark(theme);
   const { t } = useI18n();
+  const router = useRouter();
+  // Gate the notification permission prompt behind the What's New dialog so
+  // the two never stack on top of each other on a fresh install / first
+  // launch after an update. WhatsNew reports back via onDone as soon as it
+  // has nothing to show (or once its own dialog is dismissed).
+  const [readyForNotifPrompt, setReadyForNotifPrompt] = useState(false);
 
   useEffect(() => {
     hydrate().catch((e) => console.warn('hydrate failed', e));
@@ -36,6 +50,36 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [ready]);
+
+  // Initialize notifications and background tasks after hydration
+  useEffect(() => {
+    if (!ready) return;
+
+    initNotifications({
+      getPrefs: () => useStore.getState().prefs,
+      onNotificationAction: (action, data) => {
+        handleDownloadAction(action, data);
+        handleUpdateAction(action);
+      },
+    }).catch(() => {});
+    registerBackgroundTasks().catch(() => {});
+
+    // Non-blocking startup update check — never blocks the UI
+    backgroundCheckForUpdate().catch(() => {});
+  }, [ready]);
+
+  // Give the notification service access to the router for tap navigation
+  useEffect(() => {
+    if (ready && router) {
+      setRouterReference(router);
+    }
+  }, [ready, router]);
+
+  // Listener cleanup lives in its own effect with empty deps so it only ever
+  // fires on RootLayout unmount — tying it to [ready, router] risked tearing
+  // the listeners down (with nothing to re-subscribe them) if router's
+  // identity ever changed for any reason.
+  useEffect(() => removeNotificationListeners, []);
 
   return (
     <GestureHandlerRootView
@@ -64,6 +108,7 @@ export default function RootLayout() {
           >
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="novel/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="downloads" options={{ title: t('downloads.title') }} />
             <Stack.Screen name="novel/migrate" options={{ title: t('novel.migrateTitle') }} />
             <Stack.Screen name="reader/[chapterId]" options={{ headerShown: false }} />
             <Stack.Screen name="browse/[pluginId]" options={{ title: t('catalogs.browseSources') }} />
@@ -72,11 +117,16 @@ export default function RootLayout() {
             <Stack.Screen name="settings/theme" options={{ title: t('settingsTheme.title') }} />
             <Stack.Screen name="settings/reader" options={{ title: t('settingsReader.title') }} />
             <Stack.Screen name="settings/language" options={{ title: t('settingsLanguage.title') }} />
+            <Stack.Screen name="settings/notifications" options={{ title: t('settingsNotifications.title') }} />
             <Stack.Screen name="settings/storage" options={{ title: t('settingsStorage.title') }} />
             <Stack.Screen name="settings/backup" options={{ title: t('settingsBackup.title') }} />
+            <Stack.Screen name="settings/update" options={{ title: t('update.title') }} />
             <Stack.Screen name="settings/about" options={{ title: t('settingsAbout.title') }} />
           </Stack>
         )}
+        {ready ? <Toast /> : null}
+        {ready ? <WhatsNew onDone={() => setReadyForNotifPrompt(true)} /> : null}
+        {ready && readyForNotifPrompt ? <NotificationPermissionPrompt /> : null}
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
