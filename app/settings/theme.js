@@ -3,11 +3,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useI18n } from '../../hooks/useI18n';
-import { THEMES, RADIUS } from '../../theme/theme';
+import { RADIUS, THEMES, themeName, themeDescription } from '../../theme/theme';
 import Ripple from '../../components/Ripple';
 import { SectionLabel } from '../../components/MD3';
 
-function ThemePreview({ theme, selected, onPress }) {
+function ThemePreview({ theme, selected, onPress, t }) {
   return (
     <Ripple onPress={onPress}>
       <View
@@ -21,7 +21,7 @@ function ThemePreview({ theme, selected, onPress }) {
       >
         <View style={{ padding: 14, gap: 8 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ color: theme.text, fontWeight: '800', fontSize: 15 }}>{theme.name}</Text>
+            <Text style={{ color: theme.text, fontWeight: '800', fontSize: 15 }}>{themeName(t, theme)}</Text>
             {selected ? (
               <View
                 style={{
@@ -38,7 +38,7 @@ function ThemePreview({ theme, selected, onPress }) {
             ) : null}
           </View>
           {theme.description ? (
-            <Text style={{ color: theme.textMuted, fontSize: 12 }}>{theme.description}</Text>
+            <Text style={{ color: theme.textMuted, fontSize: 12 }}>{themeDescription(t, theme)}</Text>
           ) : null}
 
           <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
@@ -93,21 +93,22 @@ function ThemePreview({ theme, selected, onPress }) {
 
 export default function ThemeScreen() {
   const theme = useAppTheme();
-  const { t } = useI18n();
+  const { t: translate } = useI18n();
   const currentKey = useStore((s) => s.prefs.theme);
   const setPref = useStore((s) => s.setPref);
 
   return (
     <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-      <SectionLabel>{t('settingsTheme.title')}</SectionLabel>
+      <SectionLabel>{translate('settingsTheme.title')}</SectionLabel>
       <Text style={{ color: theme.textMuted, fontSize: 13, lineHeight: 19, marginBottom: 14 }}>
-        {t('settingsTheme.subtitle')}
+        {translate('settingsTheme.subtitle')}
       </Text>
       <View style={{ gap: 12 }}>
         {Object.values(THEMES).map((t) => (
           <ThemePreview
             key={t.key}
             theme={t}
+            t={translate}
             selected={t.key === currentKey}
             onPress={() => setPref('theme', t.key)}
           />

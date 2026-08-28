@@ -7,7 +7,7 @@ import { useAppTheme } from '../../hooks/useAppTheme';
 import { useI18n } from '../../hooks/useI18n';
 import { SectionLabel, Surface } from '../../components/MD3';
 import Ripple from '../../components/Ripple';
-import { RADIUS, THEMES } from '../../theme/theme';
+import { RADIUS, THEMES, themeName } from '../../theme/theme';
 
 function Row({ icon, title, subtitle, onPress, right, danger }) {
   const theme = useAppTheme();
@@ -62,7 +62,7 @@ export default function MoreScreen() {
         <Row
           icon="color-palette-outline"
           title={t('more.theme')}
-          subtitle={THEMES[prefs.theme]?.name ?? t('more.theme')}
+          subtitle={THEMES[prefs.theme] ? themeName(t, THEMES[prefs.theme]) : t('more.theme')}
           onPress={() => router.push('/settings/theme')}
         />
         <Divider />
