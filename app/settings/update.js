@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
-import { ScrollView, Text, View, Alert } from 'react-native';
+import { ScrollView, Text, View, Alert, Linking, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as IntentLauncher from 'expo-intent-launcher';
+import Constants from 'expo-constants';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useStore } from '../../store/useStore';
 import { useI18n } from '../../hooks/useI18n';
@@ -69,6 +71,21 @@ export default function UpdateScreen() {
     ]);
   }, [cancelAppUpdateDownload, t]);
 
+  const openUnknownSourcesSettings = useCallback(async () => {
+    if (Platform.OS !== 'android') return;
+    try {
+      await IntentLauncher.startActivityAsync('android.settings.MANAGE_UNKNOWN_APP_SOURCES', {
+        data: `package:${Constants.expoConfig?.android?.package ?? Constants.manifest?.android?.package}`,
+      });
+    } catch {
+      try {
+        await Linking.openSettings();
+      } catch {
+        Alert.alert(t('update.permissionTitle'), t('update.permissionBody'));
+      }
+    }
+  }, [t]);
+
   const handleInstall = useCallback(async () => {
     setInstallResult(null);
     const result = await installAppUpdate();
@@ -76,13 +93,13 @@ export default function UpdateScreen() {
       if (result.needsPermission) {
         Alert.alert(t('update.permissionTitle'), t('update.permissionBody'), [
           { text: t('update.permissionCancel'), style: 'cancel' },
-          { text: t('update.permissionSettings'), onPress: () => {} },
+          { text: t('update.permissionSettings'), onPress: () => openUnknownSourcesSettings() },
         ]);
       } else {
         setInstallResult(result.error);
       }
     }
-  }, [installAppUpdate, t]);
+  }, [installAppUpdate, openUnknownSourcesSettings, t]);
 
   const handleSkip = useCallback(() => {
     Alert.alert(t('update.skipThisVersion'), t('update.skipThisVersion'), [

@@ -358,12 +358,11 @@ export const alpha = (hex, a = 1) => {
 };
 
 /**
- * Resolve a theme's display name through `t`, falling back to the theme's
- * static English `name` when the theme has no localized key (the six original
- * themes ship with hardcoded names; newer themes opt into localization via
- * `nameKey`).
+ * Resolve a theme's display name. Theme names are fixed English names shown
+ * consistently across all languages (they bypass the i18n system), so this
+ * always returns the theme's static `name`.
  */
-export const themeName = (t, theme) => (theme.nameKey ? t(theme.nameKey) : theme.name);
+export const themeName = (t, theme) => theme.name;
 
 /** Resolve a theme's description through `t`, falling back to `description`. */
 export const themeDescription = (t, theme) =>
