@@ -20,9 +20,7 @@ function Act({ icon, label, onPress, disabled }) {
   );
 }
 
-// Labeled pill for the selection-scope tools (Select all / except / between).
-// These are the actions that define selection mode's whole point, so they get
-// text, not just an icon someone has to guess at.
+// Labeled pill for the selection-scope tools (select all / except / between).
 function Chip({ theme, icon, label, onPress, disabled }) {
   return (
     <View style={{ borderRadius: RADIUS.pill, overflow: 'hidden' }}>
@@ -53,12 +51,6 @@ function Chip({ theme, icon, label, onPress, disabled }) {
 /**
  * Contextual app bar for chapter multi-select. Overlays the screen top so the
  * chapter list underneath is never remounted when selection mode toggles.
- *
- * Three rows, in order of what the user needs first:
- *  1. Close + count — "you're selecting, N so far"
- *  2. Selection-scope tools (select all / except / between) — available the
- *     instant selection starts, not gated behind picking a second chapter
- *  3. Bulk actions on the selection (download, mark read, etc.)
  */
 function SelectionBar({
   count,

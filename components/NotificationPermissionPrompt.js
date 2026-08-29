@@ -6,6 +6,7 @@ import { useAppTheme } from '../hooks/useAppTheme';
 import { useI18n } from '../hooks/useI18n';
 import { Dialog, Button } from './MD3';
 import { getPermissionInfo, requestPermission, openNotificationSettings } from '../lib/notifications';
+import { isExpoGo } from '../lib/nativeSupport';
 import { alpha } from '../theme/theme';
 
 /**
@@ -28,7 +29,16 @@ export default function NotificationPermissionPrompt() {
   const [canAskAgain, setCanAskAgain] = useState(true);
   const [checked, setChecked] = useState(false);
 
+  // Notifications are unavailable in Expo Go — never prompt there. Kept as a
+  // variable (not an early return) so every hook still runs in a stable order.
+  const isGo = isExpoGo();
+
   useEffect(() => {
+    // Notifications are unavailable in Expo Go — resolve silently without a prompt.
+    if (isGo) {
+      setChecked(true);
+      return;
+    }
     if (promptSeen) {
       setChecked(true);
       return;
@@ -54,7 +64,7 @@ export default function NotificationPermissionPrompt() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [promptSeen]);
+  }, [promptSeen, isGo]);
 
   const resolve = useCallback(async () => {
     setVisible(false);
@@ -74,6 +84,7 @@ export default function NotificationPermissionPrompt() {
     await resolve();
   }, [canAskAgain, resolve]);
 
+  if (isGo) return null;
   if (!checked || !visible) return null;
 
   return (
