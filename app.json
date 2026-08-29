@@ -6,16 +6,9 @@
     "scheme": "honya",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "icon": "./assets/icon.png",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "cover",
-      "backgroundColor": "#000000"
-    },
     "android": {
-      "package": "com.example.honya",
-      "edgeToEdgeEnabled": true
+      "package": "com.example.honya"
     },
     "ios": {
       "supportsTablet": true,
@@ -25,7 +18,14 @@
       "./plugins/withInAppUpdate",
       "expo-dev-client",
       "expo-router",
-      "expo-splash-screen",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "cover",
+          "backgroundColor": "#000000"
+        }
+      ],
       "expo-sqlite",
       [
         "expo-notifications",
@@ -34,7 +34,10 @@
           "color": "#000000"
         }
       ],
-      "expo-background-task"
+      "expo-background-task",
+      "expo-font",
+      "expo-sharing",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": false

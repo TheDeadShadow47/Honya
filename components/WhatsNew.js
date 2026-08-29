@@ -5,7 +5,7 @@ import { useAppTheme } from '../hooks/useAppTheme';
 import { useI18n } from '../hooks/useI18n';
 import { Dialog, Button } from './MD3';
 import { checkWhatsNew, markWhatsNewSeen, parseReleaseNotes } from '../lib/updateManager';
-import { alpha, RADIUS } from '../theme/theme';
+import { alpha } from '../theme/theme';
 
 /** What's New dialog — shown once after an app update is installed. */
 export default function WhatsNew({ onDone } = {}) {

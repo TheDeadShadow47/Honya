@@ -32,13 +32,12 @@ export default function BrowsePluginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const instance = useMemo(() => {
-    if (!record) return null;
+  const { instance, loadError } = useMemo(() => {
+    if (!record) return { instance: null, loadError: null };
     try {
-      return loadPlugin(record);
+      return { instance: loadPlugin(record), loadError: null };
     } catch (e) {
-      setError(e.message);
-      return null;
+      return { instance: null, loadError: e.message };
     }
   }, [record]);
 
@@ -79,9 +78,11 @@ export default function BrowsePluginScreen() {
     [instance, mode, query, id],
   );
 
+  /* eslint-disable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
   useEffect(() => {
     if (instance && mode !== 'search') load(1, true);
-  }, [instance, mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [instance, mode]);
+  /* eslint-enable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
 
   if (!record) {
     return (
@@ -116,7 +117,7 @@ export default function BrowsePluginScreen() {
         {mode === 'search' ? (
           <Button label={t('browse.searchAction')} icon={<Ionicons name="search" size={15} color={theme.onPrimary} />} onPress={() => load(1, true)} />
         ) : null}
-        {error ? <Text style={{ color: theme.error, fontSize: 12.5 }}>{error}</Text> : null}
+        {error || loadError ? <Text style={{ color: theme.error, fontSize: 12.5 }}>{error || loadError}</Text> : null}
       </View>
 
       <FlatList

@@ -22,6 +22,7 @@ export default function NotificationPermissionPrompt() {
   // Expo Go has no notifications; kept as a variable so every hook runs in stable order.
   const isGo = isExpoGo();
 
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
   useEffect(() => {
     // Notifications are unavailable in Expo Go — resolve silently without a prompt.
     if (isGo) {
@@ -50,8 +51,8 @@ export default function NotificationPermissionPrompt() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promptSeen, isGo]);
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   const resolve = useCallback(async () => {
     setVisible(false);

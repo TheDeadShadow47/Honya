@@ -13,6 +13,7 @@ export default function BottomSheet({ visible, onDismiss, children, maxHeight = 
   const [mounted, setMounted] = useState(visible);
   const progress = useRef(new Animated.Value(0)).current;
 
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
   useEffect(() => {
     if (visible) {
       setMounted(true);
@@ -23,7 +24,9 @@ export default function BottomSheet({ visible, onDismiss, children, maxHeight = 
         if (finished) setMounted(false);
       });
     }
-  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+    // setMounted() gates content on the mount/unmount animation; not a cascading render.
+  }, [visible]);
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   const dismiss = useCallback(() => onDismiss?.(), [onDismiss]);
 
