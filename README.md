@@ -45,8 +45,8 @@ Under the hood, Honya pairs an LNReader-compatible plugin engine with a hand-rol
 - ⬇️ **Download Manager** — track, pause, and cancel queued chapter downloads
 - 📶 **Offline reading** — read downloaded chapters without a connection; progress saved locally via SQLite
 - 🔄 **Automatic & manual library updates** — keep your library in sync with the latest chapters, smooth even for large libraries
-- 🔔 **Notifications** — download / update progress and results, with pause and cancel actions
-- 🕐 **In-app updates** — check for new versions and install the APK directly inside Honya
+- 🔔 **Notifications** — download / update progress and results, keeping background activity visible without requiring the app to stay open
+- 🕐 **In-app updates** — check for new versions, download updates, and launch the Android installation flow from inside Honya
 - 🔖 **Per-chapter progress** — scroll position and read status tracked per chapter
 - ✅ **Advanced chapter selection** — long-press for bulk download, mark, or remove
 - 🔍 **Filter / sort / display** — downloaded-unread filters, sort by number or date, toggle row metadata
@@ -76,7 +76,7 @@ Under the hood, Honya pairs an LNReader-compatible plugin engine with a hand-rol
 
 ## 🎨 Theming
 
-Honya ships with 15 built-in themes — 9 of them added in 1.4.0 — switchable from **Settings → Theme**:
+Honya ships with 15 built-in themes — dark, light, OLED, and colorful options for every taste — switchable from **Settings → Theme**:
 
 | Theme | Description |
 |---|---|
