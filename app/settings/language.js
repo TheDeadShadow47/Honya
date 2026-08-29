@@ -5,8 +5,7 @@ import { useAppTheme } from '../../hooks/useAppTheme';
 import { SectionLabel } from '../../components/MD3';
 import Ripple from '../../components/Ripple';
 import { RADIUS } from '../../theme/theme';
-import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS } from '../../lib/i18n';
-import { setLanguage, applyDirection } from '../../lib/i18n';
+import { SUPPORTED_LANGUAGES, LANGUAGE_LABELS, setLanguage, applyDirection } from '../../lib/i18n';
 import { useI18n } from '../../hooks/useI18n';
 
 function LanguageOption({ language, label, selected, onPress }) {

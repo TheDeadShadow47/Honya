@@ -132,7 +132,7 @@ export default function CatalogsScreen() {
         setResults(r);
         setHasSearched(true);
         setErrorCount(errors.length);
-      } catch (e) {
+      } catch (_e) {
         if (req !== requestRef.current) return;
         setResults([]);
         setHasSearched(true);

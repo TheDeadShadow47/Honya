@@ -28,13 +28,6 @@ function Action({ icon, label, active, refreshing, onPress }) {
   );
 }
 
-/**
- * Novel details header: cover + metadata, actions, description, genre chips,
- * the Continue reading button and the chapter-list toolbar.
- *
- * Memoised so that opening the filter sheet or selecting chapters never
- * re-renders this (fairly heavy) subtree.
- */
 function NovelHeader({
   novel,
   sourceName,

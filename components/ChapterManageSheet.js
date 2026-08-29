@@ -62,12 +62,6 @@ const OptionRow = memo(function OptionRow({ label, hint, icon, selected, radio, 
   );
 });
 
-/**
- * Chapter management sheet: Filter, Sort and Display.
- *
- * Purely presentational — every value lives in the novel screen, so opening the
- * sheet never touches the chapter list or triggers any chapter processing.
- */
 function ChapterManageSheet({
   visible,
   onDismiss,
@@ -100,7 +94,6 @@ function ChapterManageSheet({
         ) : null}
       </View>
 
-      {/* Segmented tabs — switching only swaps a tiny option list. */}
       <View style={[styles.segment, { backgroundColor: theme.surface1, borderColor: theme.outline }]}>
         {TABS.map((tabItem) => {
           const active = tab === tabItem.key;

@@ -23,14 +23,12 @@ const FETCH_CACHE_LIMIT = 25;
 // In-flight dedup: overlapping requests for the same chapter share one promise.
 const inflightTextFetches = new Map();
 
-// Cumulative content offset of a segment's top edge (paddingTop + all prior heights).
 function segOffset(heights, paddingTop, index) {
   let s = paddingTop;
   for (let i = 0; i < index; i++) s += heights[i] ?? 0;
   return s;
 }
 
-// The segment that owns scroll position y (in content coordinates).
 function activeIndexAt(heights, paddingTop, y) {
   let acc = paddingTop;
   for (let i = 0; i < heights.length; i++) {
@@ -41,7 +39,6 @@ function activeIndexAt(heights, paddingTop, y) {
   return Math.max(0, heights.length - 1);
 }
 
-/** Chapter name flanked by rules, rendered between appended chapters. */
 function ChapterDivider({ name, fg }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 36, marginBottom: 22 }}>
@@ -52,7 +49,6 @@ function ChapterDivider({ name, fg }) {
   );
 }
 
-/** Inline load failure for an appended chapter (offline / network error). */
 function InlineError({ offline, error, fg, bg, onRetry, t }) {
   return (
     <View style={{ marginVertical: 28 }}>
@@ -116,7 +112,6 @@ export default function ReaderScreen() {
     ctx?.novelTitle ? { id: ctx.novelId, title: ctx.novelTitle, pluginId: null } : null,
   );
   const [neighbours, setNeighbours] = useState({ prev: null, next: null });
-  // Continuous reading: an ordered list of rendered chapters.
   const [segments, setSegments] = useState([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -165,7 +160,6 @@ export default function ReaderScreen() {
     if (scrollRef.current) scrollRef.current.scrollTo({ y: 0, animated: false });
   }, [id]);
 
-  /** Resolve the installed extension that can fetch this chapter's novel. */
   const resolvePluginFor = useCallback(async (ch) => {
     const current = novelRef.current;
     if (current?.id === ch.novelId) {
@@ -185,11 +179,7 @@ export default function ReaderScreen() {
     return rec;
   }, []);
 
-  /**
-   * Fetch a chapter's cleaned text, from the download cache, the in-memory
-   * session cache, or the plugin. `force` bypasses the session cache (manual
-   * refresh). Concurrent requests for the same chapter share one promise.
-   */
+  // Cache-first: download cache, in-memory session cache, or plugin; `force` bypasses the cache.
   const fetchChapterText = useCallback(async (ch, { force = false } = {}) => {
     if (ch?.downloadedText) return sanitizeChapter(ch.downloadedText, { title: ch?.name });
     const key = ch?.id;
@@ -219,12 +209,7 @@ export default function ReaderScreen() {
     return run;
   }, [resolvePluginFor]);
 
-  /**
-   * Background fetch of the single next chapter (by number) so tapping the
-   * "next" chevron or scrolling to the end opens it almost instantly. Runs once
-   * per loaded chapter, only for a non-downloaded entry (an online session),
-   * and never duplicates an already-cached/in-flight request.
-   */
+  // Best-effort prefetch of the next chapter; never duplicates a cached/in-flight request.
   const maybePrefetchNext = useCallback(
     (ch) => {
       if (prefetchingRef.current || !ch) return;
@@ -247,7 +232,6 @@ export default function ReaderScreen() {
     [fetchChapterText],
   );
 
-  /** Append the chapter after the last loaded one (or a failed placeholder). */
   const appendNextSegment = useCallback(async () => {
     if (appendingRef.current || endRef.current) return;
     const last = segmentsRef.current[segmentsRef.current.length - 1];
@@ -261,11 +245,11 @@ export default function ReaderScreen() {
         endRef.current = true;
         return;
       }
-      if (appendedIdsRef.current.has(next.id)) return; // already in the list
+      if (appendedIdsRef.current.has(next.id)) return;
       let seg = { id: next.id, name: next.name, ch: next, text: '', rtl: false, status: 'ready', error: null, offline: false };
       try {
         const text = await fetchChapterText(next);
-        // Each appended chapter gets its own direction from its own text, so a session can mix languages.
+        // Per-segment direction so a session can mix languages.
         seg = { ...seg, text, rtl: isArabicText(text) };
       } catch (e) {
         const msg = String(e?.message ?? '');
@@ -302,22 +286,12 @@ export default function ReaderScreen() {
     [refreshHistory, refreshLibrary],
   );
 
-  /**
-   * Load the entry chapter for the reader.
-   *
-   * The reader becomes its own loading surface: a lightweight placeholder
-   * segment (chapter title + inline spinner) renders immediately, cached /
-   * downloaded bodies replace it the moment the DB row is read, and anything
-   * not yet local (a remote chapter) arrives in the background. History / read
-   * bookkeeping happens after the first render, never before it.
-   */
   const load = useCallback(async (force = false) => {
     if (loadBusyRef.current && force) return; // ignore refresh taps while one is running
     const gen = ++loadGenRef.current;
     loadBusyRef.current = true;
     setError(null);
     setOffline(false);
-    // Reset all continuous-reading state for the new entry chapter.
     segmentsRef.current = [];
     heightsRef.current = [];
     progressMapRef.current = new Map();
@@ -371,7 +345,6 @@ export default function ReaderScreen() {
       });
 
       if (ch.downloadedText) {
-        // Cached/downloaded → render immediately, housekeeping in the background.
         const text = sanitizeChapter(ch.downloadedText, { title: ch.name });
         fetchedTextCache.set(ch.id, { text, rtl: isArabicText(text) });
         if (fetchedTextCache.size > FETCH_CACHE_LIMIT) {
@@ -390,9 +363,8 @@ export default function ReaderScreen() {
         return;
       }
 
-      // Remote chapter: cache-first fetch in the background behind the placeholder.
       try {
-        await novelPromise; // fast DB read; resolves the plugin for the fetch
+        await novelPromise;
         if (gen !== loadGenRef.current) return;
         const text = await fetchChapterText(ch, { force });
         if (gen !== loadGenRef.current) return;
@@ -463,7 +435,7 @@ export default function ReaderScreen() {
     (_w, height) => {
       if (loading) return;
       const first = segmentsRef.current[0];
-      if (!first || first.status !== 'ready') return; // placeholder/in-flight body
+      if (!first || first.status !== 'ready') return;
       if (!restoredRef.current) {
         restoredRef.current = true;
         const saved = progressRef.current;
@@ -488,14 +460,13 @@ export default function ReaderScreen() {
       viewportRef.current = layoutMeasurement.height;
       const y = contentOffset.y;
       const segs = segmentsRef.current;
-      if (!segs.length || !segs[0].ch) return; // placeholder body isn't scrollable yet
+      if (!segs.length || !segs[0].ch) return;
 
       const idx = Math.max(0, Math.min(activeIndexAt(heightsRef.current, contentPadTop, y), segs.length - 1));
       const prevIdx = activeIndexRef.current;
       const lastId = segs[segs.length - 1]?.id;
 
       if (idx !== prevIdx) {
-        // Crossed a chapter boundary.
         const prevSeg = segs[prevIdx];
         if (prevSeg) {
           if (idx > prevIdx) {
@@ -516,7 +487,6 @@ export default function ReaderScreen() {
         }
         activeIndexRef.current = idx;
         setActiveIndex(idx);
-        // Entering the last loaded segment → prefetch the next chapter.
         if (idx === segs.length - 1) appendNextSegment();
       } else {
         // Within one chapter: track a local ratio.
@@ -654,7 +624,6 @@ export default function ReaderScreen() {
     ]);
   };
 
-  /** Re-fetch a failed appended segment (used by its inline Retry). */
   const retrySegment = useCallback(
     async (segId) => {
       const seg = segmentsRef.current.find((s) => s.id === segId);
@@ -754,8 +723,7 @@ export default function ReaderScreen() {
                       color: palette.fg,
                       fontSize: prefs.fontSize,
                       lineHeight: prefs.fontSize * prefs.lineHeight,
-                      // Direction comes from the segment's own text, not the UI RTL setting; textAlign must be
-                      // explicit or 'auto' resolves against I18nManager's global RTL (the Arabic-UI English bug).
+                      // Per-segment direction; explicit textAlign avoids I18nManager RTL (Arabic-UI/English bug).
                       writingDirection: seg.rtl ? 'rtl' : 'ltr',
                       textAlign: seg.rtl ? 'right' : 'left',
                     }}
