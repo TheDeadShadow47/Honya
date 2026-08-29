@@ -20,7 +20,6 @@ function Act({ icon, label, onPress, disabled }) {
   );
 }
 
-// Labeled pill for the selection-scope tools (select all / except / between).
 function Chip({ theme, icon, label, onPress, disabled }) {
   return (
     <View style={{ borderRadius: RADIUS.pill, overflow: 'hidden' }}>
@@ -48,10 +47,6 @@ function Chip({ theme, icon, label, onPress, disabled }) {
   );
 }
 
-/**
- * Contextual app bar for chapter multi-select. Overlays the screen top so the
- * chapter list underneath is never remounted when selection mode toggles.
- */
 function SelectionBar({
   count,
   total,
@@ -95,8 +90,6 @@ function SelectionBar({
         <Text style={{ color: theme.textMuted, fontSize: 12 }}>{t('selection.ofN', { count, total })}</Text>
       </View>
 
-      {/* Available the moment selection starts — a single selected chapter is
-          all "select all except" needs, no second pick required. */}
       <View style={[styles.tools, { borderTopColor: theme.outline }]}>
         <Chip theme={theme} icon="checkmark-done-outline" label={t('selection.selectAll')} onPress={onToggleAll} />
         <Chip theme={theme} icon="remove-circle-outline" label={t('selection.selectAllExcept')} onPress={onSelectAllExcept} />

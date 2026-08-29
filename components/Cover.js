@@ -3,15 +3,7 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { RADIUS } from '../theme/theme';
 
-/**
- * Memoised novel cover.
- *
- * Re-renders only when the uri/size actually change, which keeps large grids
- * and lists from re-decoding the same bitmap while scrolling. `fadeDuration={0}`
- * avoids the default Android cross-fade, the single biggest source of jank when
- * cells recycle. Offline behaviour is unchanged: the same remote uri is handed
- * to RN's image cache as before.
- */
+/** `fadeDuration={0}` avoids the default Android cross-fade, a big source of jank when cells recycle. */
 const Cover = memo(function Cover({ uri, width, height, radius = RADIUS.md, title, style }) {
   const theme = useAppTheme();
   const [failed, setFailed] = useState(false);

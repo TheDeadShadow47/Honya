@@ -10,12 +10,6 @@ import Ripple from './Ripple';
 /** Fixed row height so the list can use getItemLayout on huge novels. */
 export const CHAPTER_ROW_HEIGHT = 68;
 
-/**
- * Single chapter row.
- *
- * Memoised and driven by *stable* callbacks that receive the chapter, so
- * selecting one chapter re-renders exactly one row instead of the whole list.
- */
 const ChapterRow = memo(function ChapterRow({
   chapter,
   onPress,
@@ -141,12 +135,6 @@ const styles = StyleSheet.create({
   downloadButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 });
 
-/**
- * Store-connected row. Reads only this chapter's download state from the
- * global store, so a bulk download advancing chapter N re-renders exactly that
- * one row (not the whole list). The screen passes no downloadState prop — it
- * no longer needs to subscribe to every chapter's download progress.
- */
 const ChapterRowBound = memo(function ChapterRowBound({ chapter, ...rest }) {
   const downloadState = useStore((s) => (s.downloadStates ? s.downloadStates[chapter.id] : undefined));
   return <ChapterRow {...rest} chapter={chapter} downloadState={downloadState} />;

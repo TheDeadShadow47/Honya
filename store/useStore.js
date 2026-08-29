@@ -8,19 +8,19 @@ import { setLanguage, applyDirection } from '../lib/i18n';
 import * as backup from '../lib/backup';
 import * as downloadQueue from '../lib/downloadQueue';
 import * as libraryUpdate from '../lib/libraryUpdate';
+// Side-effect import: registers the OS background download worker via module-level defineTask().
+import '../lib/backgroundDownload';
 import * as updateManager from '../lib/updateManager';
 
 const PREFS_KEY = '@honya/prefs';
 const REPOS_KEY = '@honya/repos';
 
-// v1.1+ renamed Shosetsu-era AsyncStorage keys; this map migrates existing installs in place.
 const LEGACY_KEY_MAP = {
   '@shosetsu/prefs': PREFS_KEY,
   '@shosetsu/repos': REPOS_KEY,
   '@shosetsu/chapterPrefs': CHAPTER_PREFS_KEY,
 };
 
-/** One-time, idempotent: copies any legacy @shosetsu/* values to their @honya/* key, then removes the old key. */
 async function migrateLegacyStorageKeys() {
   const pairs = Object.entries(LEGACY_KEY_MAP);
   const allKeys = pairs.flatMap(([oldKey, newKey]) => [oldKey, newKey]);
@@ -77,7 +77,6 @@ export const useStore = create((set, get) => ({
   updateSummary: { lastUpdateAt: null, checked: 0, updated: 0, newChapters: 0, failed: [] },
   appUpdateState: updateManager.getState(),
 
-  /* ---------- bootstrap ---------- */
   hydrate: async () => {
     await db.initDatabase();
     await migrateLegacyStorageKeys();
@@ -104,8 +103,6 @@ export const useStore = create((set, get) => ({
     await get().refreshUpdates();
     await get().refreshHistory();
 
-    // Mirror the download queue / update engine's own state into the store so
-    // any screen can subscribe with plain useStore selectors.
     downloadQueue.subscribe((snapshot) => {
       set({ downloadQueueState: snapshot, downloadStates: snapshot.states });
     });
@@ -125,7 +122,6 @@ export const useStore = create((set, get) => ({
     const savedSummary = await libraryUpdate.loadPersistedSummary();
     if (savedSummary) set({ updateSummary: savedSummary });
 
-    // Subscribe to update manager state changes
     updateManager.subscribe((appUpdateState) => {
       set({ appUpdateState });
     });
@@ -229,8 +225,6 @@ export const useStore = create((set, get) => ({
     return { results, errors };
   },
 
-  /* downloads — all roads lead through the central queue (lib/downloadQueue.js).
-   * Concurrency is fixed at 1 worker there; nothing here downloads directly. */
   downloadChapter: async (chapter) => {
     if (!chapter?.id) return;
     const novel = await db.getNovel(chapter.novelId);
@@ -254,9 +248,7 @@ export const useStore = create((set, get) => ({
   clearCompletedDownloads: () => downloadQueue.clearCompleted(),
   clearFailedDownloads: () => downloadQueue.clearFailed(),
 
-  // Storage screen's "delete all downloads" — wipes chapter content AND the
-  // completed-queue history so the Downloads screen doesn't keep showing
-  // entries for content that was just deleted.
+  // Also clears completed-queue history so the Downloads screen doesn't list wiped content.
   clearAllDownloads: async () => {
     await db.clearDownloads();
     await downloadQueue.clearCompleted();
@@ -269,8 +261,6 @@ export const useStore = create((set, get) => ({
     set({ downloadStates: next });
   },
 
-  /* library updates — see lib/libraryUpdate.js. Guarded there so a manual
-   * update and the background one can never run concurrently. */
   runLibraryUpdate: (opts) => libraryUpdate.runLibraryUpdate(opts),
   cancelLibraryUpdate: () => libraryUpdate.cancelLibraryUpdate(),
 
@@ -278,10 +268,6 @@ export const useStore = create((set, get) => ({
   refreshLibrary: async () => set({ library: await db.getLibrary() }),
   refreshUpdates: async () => set({ updates: await db.getRecentUpdates() }),
 
-  /* history 
-   * Reads straight from the chapters table (the existing source of truth for
-   * reading state). No separate history storage exists.
-   */
   refreshHistory: async () => set({ history: await db.getHistory() }),
   removeHistoryEntry: async (chapterId) => {
     await db.removeHistoryEntry(chapterId);
@@ -305,11 +291,6 @@ export const useStore = create((set, get) => ({
     await get().refreshHistory();
   },
 
-  /* ---------- backup / restore ----------
-   * See lib/backup.js for the file format. Downloaded chapter text, cover
-   * files and plugin source code are never included - only library,
-   * progress, settings, repositories and extension metadata.
-   */
   createBackup: async () => {
     const data = {
       prefs: get().prefs,
@@ -322,10 +303,9 @@ export const useStore = create((set, get) => ({
     return { ...file, novels: data.novels.length, extensions: data.extensions.length };
   },
 
-  /** Validates and applies a backup file. Throws BackupError before touching any state if invalid. */
   restoreBackup: async (fileUri) => {
     const raw = await backup.readBackupFile(fileUri);
-    const parsed = backup.validateBackup(raw); // throws before anything is written
+    const parsed = backup.validateBackup(raw);
 
     // Only accept known pref keys with the expected type — backups are untrusted input.
     const safePrefs = {};

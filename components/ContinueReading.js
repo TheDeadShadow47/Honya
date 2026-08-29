@@ -10,11 +10,6 @@ import { encodeNavParam } from '../lib/navIds';
 import { setPendingReader } from '../lib/readerContext';
 import { RADIUS } from '../theme/theme';
 
-/**
- * Surfaces the single most recently opened chapter so the user can resume
- * reading without going through library -> novel -> chapter list. Reuses the
- * existing history/progress data — no separate progress tracking.
- */
 export default function ContinueReading({ entry }) {
   const theme = useAppTheme();
   const router = useRouter();

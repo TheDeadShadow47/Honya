@@ -322,10 +322,6 @@ export const READER_BACKGROUNDS = [
   { key: 'white', name: 'White', bg: '#ffffff', fg: '#16161a' },
 ];
 
-/* ---------- shared layout tokens ----------
- * Single source of truth for spacing, type scale and elevation so every screen
- * uses the same rhythm instead of ad-hoc numbers.
- */
 export const SPACING = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
 
 export const TYPE = {
@@ -357,13 +353,8 @@ export const alpha = (hex, a = 1) => {
   return `${hex}${v}`;
 };
 
-/**
- * Resolve a theme's display name. Theme names are fixed English names shown
- * consistently across all languages (they bypass the i18n system), so this
- * always returns the theme's static `name`.
- */
+/** Theme names are fixed English and bypass i18n, so `t` is intentionally unused. */
 export const themeName = (t, theme) => theme.name;
 
-/** Resolve a theme's description through `t`, falling back to `description`. */
 export const themeDescription = (t, theme) =>
   theme.descriptionKey ? t(theme.descriptionKey) : theme.description;

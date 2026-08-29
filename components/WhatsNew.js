@@ -7,10 +7,7 @@ import { Dialog, Button } from './MD3';
 import { checkWhatsNew, markWhatsNewSeen, parseReleaseNotes } from '../lib/updateManager';
 import { alpha, RADIUS } from '../theme/theme';
 
-/**
- * What's New dialog — shown once after an app update is installed.
- * Mounted in RootLayout; manages its own visibility.
- */
+/** What's New dialog — shown once after an app update is installed. */
 export default function WhatsNew({ onDone } = {}) {
   const theme = useAppTheme();
   const { t } = useI18n();
@@ -26,9 +23,6 @@ export default function WhatsNew({ onDone } = {}) {
           setData(result);
           setVisible(true);
         } else {
-          // Nothing to show this launch — let the caller move on to whatever
-          // comes next (e.g. the notification permission prompt) right away
-          // instead of it waiting on a dialog that will never appear.
           onDone?.();
         }
       })
@@ -54,7 +48,6 @@ export default function WhatsNew({ onDone } = {}) {
   return (
     <Dialog visible={visible} title={t('update.whatsNewTitle', { version: data.version })} onDismiss={handleDismiss}>
       <View style={{ maxHeight: 400 }}>
-        {/* Hero icon */}
         <View style={{ alignItems: 'center', marginBottom: 18 }}>
           <View
             style={{

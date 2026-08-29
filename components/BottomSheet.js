@@ -7,16 +7,6 @@ import { RADIUS } from '../theme/theme';
 const OPEN = { duration: 210, easing: Easing.out(Easing.cubic), useNativeDriver: true };
 const CLOSE = { duration: 160, easing: Easing.in(Easing.cubic), useNativeDriver: true };
 
-/**
- * Reusable modal bottom sheet.
- *
- * Performance notes:
- * - The native `Modal` slide animation is disabled and replaced with an
- *   `Animated` transform driven by the native driver, so opening the sheet does
- *   no work on the JS thread while the animation runs.
- * - Children are only mounted while the sheet is on screen, so an open/close
- *   cycle never keeps an off-screen tree alive under a long list.
- */
 export default function BottomSheet({ visible, onDismiss, children, maxHeight = '80%' }) {
   const theme = useAppTheme();
   const insets = useSafeAreaInsets();

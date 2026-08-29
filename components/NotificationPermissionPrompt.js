@@ -9,17 +9,7 @@ import { getPermissionInfo, requestPermission, openNotificationSettings } from '
 import { isExpoGo } from '../lib/nativeSupport';
 import { alpha } from '../theme/theme';
 
-/**
- * First-launch notification permission explainer.
- *
- * Mounted in RootLayout, after the What's New dialog (if any) has resolved,
- * so the two never stack. Shown at most once per install: as soon as the
- * user resolves it (allow, deny, or "Not now") `notificationPromptSeen` is
- * persisted and this component never renders again, on this or any later
- * launch. If the OS permission is already 'granted' (or was already decided
- * before this build shipped) it resolves itself silently without ever
- * showing anything.
- */
+/** Shown at most once per install; resolves silently if permission is already granted. */
 export default function NotificationPermissionPrompt() {
   const theme = useAppTheme();
   const { t } = useI18n();
@@ -29,8 +19,7 @@ export default function NotificationPermissionPrompt() {
   const [canAskAgain, setCanAskAgain] = useState(true);
   const [checked, setChecked] = useState(false);
 
-  // Notifications are unavailable in Expo Go — never prompt there. Kept as a
-  // variable (not an early return) so every hook still runs in a stable order.
+  // Expo Go has no notifications; kept as a variable so every hook runs in stable order.
   const isGo = isExpoGo();
 
   useEffect(() => {
@@ -48,9 +37,7 @@ export default function NotificationPermissionPrompt() {
       .then(({ status, canAskAgain: again }) => {
         if (cancelled) return;
         if (status === 'granted') {
-          // Already granted some other way (e.g. restored from a backup on a
-          // device that had already allowed it) — nothing to ask, just mark
-          // it resolved so we never check again.
+          // Already granted (e.g. restored from a backup) — resolve silently so we never check again.
           setPref('notificationPromptSeen', true);
           setChecked(true);
           return;
@@ -73,9 +60,7 @@ export default function NotificationPermissionPrompt() {
 
   const handleEnable = useCallback(async () => {
     if (!canAskAgain) {
-      // The OS will no longer show its own dialog (already denied once
-      // before, or the device policy blocks re-prompting) — the only real
-      // path back is the system settings screen.
+      // OS will no longer prompt again; the only path back is system settings.
       openNotificationSettings();
       await resolve();
       return;

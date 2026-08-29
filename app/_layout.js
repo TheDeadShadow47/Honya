@@ -29,10 +29,7 @@ export default function RootLayout() {
   const isDark = isThemeDark(theme);
   const { t } = useI18n();
   const router = useRouter();
-  // Gate the notification permission prompt behind the What's New dialog so
-  // the two never stack on top of each other on a fresh install / first
-  // launch after an update. WhatsNew reports back via onDone as soon as it
-  // has nothing to show (or once its own dialog is dismissed).
+  // Gate the notification prompt behind What's New so the two never stack on a fresh install.
   const [readyForNotifPrompt, setReadyForNotifPrompt] = useState(false);
 
   useEffect(() => {
@@ -51,7 +48,6 @@ export default function RootLayout() {
     }
   }, [ready]);
 
-  // Initialize notifications and background tasks after hydration
   useEffect(() => {
     if (!ready) return;
 
@@ -64,21 +60,16 @@ export default function RootLayout() {
     }).catch(() => {});
     registerBackgroundTasks().catch(() => {});
 
-    // Non-blocking startup update check — never blocks the UI
     backgroundCheckForUpdate().catch(() => {});
   }, [ready]);
 
-  // Give the notification service access to the router for tap navigation
   useEffect(() => {
     if (ready && router) {
       setRouterReference(router);
     }
   }, [ready, router]);
 
-  // Listener cleanup lives in its own effect with empty deps so it only ever
-  // fires on RootLayout unmount — tying it to [ready, router] risked tearing
-  // the listeners down (with nothing to re-subscribe them) if router's
-  // identity ever changed for any reason.
+  // Empty deps so listener cleanup only ever fires on RootLayout unmount.
   useEffect(() => removeNotificationListeners, []);
 
   return (

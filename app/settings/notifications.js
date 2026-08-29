@@ -103,8 +103,7 @@ export default function NotificationsScreen() {
     getBackgroundTaskInfo('honya-library-update').then(setTaskInfo).catch(() => {});
   }, []);
 
-  // Re-read on every focus, not just mount — catches the user granting the
-  // permission from the OS Settings app and coming back to Honya.
+  // Re-read on focus so permissions granted in OS Settings show up on return.
   useFocusEffect(
     useCallback(() => {
       getPermissionInfo()

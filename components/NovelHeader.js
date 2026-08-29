@@ -28,11 +28,6 @@ function Action({ icon, label, active, refreshing, onPress }) {
   );
 }
 
-/**
- * Novel details header (cover, actions, description, chapter toolbar).
- * Memoised so the filter sheet / chapter selection never re-renders this
- * heavy subtree.
- */
 function NovelHeader({
   novel,
   sourceName,

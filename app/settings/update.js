@@ -112,13 +112,12 @@ export default function UpdateScreen() {
     dismissAppUpdate();
   }, [dismissAppUpdate]);
 
-  // Parse release notes
   const notes = release ? parseReleaseNotes(release.body) : null;
   const hasNotes = notes && (notes.newFeatures.length || notes.improvements.length || notes.bugFixes.length);
 
   return (
     <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={{ padding: 16 }}>
-      {/* ── Current Version ────────────────────────────────────────────── */}
+      {/* Current Version */}
       <Surface level={1} style={{ padding: 18, marginBottom: 18 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <View style={{ flex: 1 }}>
@@ -142,7 +141,7 @@ export default function UpdateScreen() {
         </View>
       </Surface>
 
-      {/* ── Checking ──────────────────────────────────────────────────── */}
+      {/* Checking */}
       {checking && (
         <Surface level={1} style={{ padding: 22, marginBottom: 18, alignItems: 'center' }}>
           <Ionicons name="sync-outline" size={28} color={theme.primary} style={{ marginBottom: 12 }} />
@@ -152,7 +151,7 @@ export default function UpdateScreen() {
         </Surface>
       )}
 
-      {/* ── Up To Date ────────────────────────────────────────────────── */}
+      {/* Up To Date */}
       {isUpToDate && (
         <Surface level={1} style={{ padding: 22, marginBottom: 18, alignItems: 'center' }}>
           <View
@@ -180,7 +179,7 @@ export default function UpdateScreen() {
         </Surface>
       )}
 
-      {/* ── Check / Download Error ─────────────────────────────────────── */}
+      {/* Check / Download Error */}
       {isFailed && !checking && !isDownloading && (
         <Surface level={1} style={{ padding: 22, marginBottom: 18, alignItems: 'center' }}>
           <View
@@ -209,7 +208,7 @@ export default function UpdateScreen() {
         </Surface>
       )}
 
-      {/* ── Update Available ──────────────────────────────────────────── */}
+      {/* Update Available */}
       {isUpdateAvailable && release && (
         <Surface level={1} style={{ padding: 20, marginBottom: 18 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
@@ -317,7 +316,7 @@ export default function UpdateScreen() {
         </Surface>
       )}
 
-      {/* ── Downloading ───────────────────────────────────────────────── */}
+      {/* Downloading */}
       {isDownloading && (
         <Surface level={1} style={{ padding: 22, marginBottom: 18 }}>
           <Text style={{ color: theme.text, fontSize: 16, fontWeight: '700', textAlign: 'center', marginBottom: 4 }}>
@@ -346,7 +345,7 @@ export default function UpdateScreen() {
         </Surface>
       )}
 
-      {/* ── Ready to Install ──────────────────────────────────────────── */}
+      {/* Ready to Install */}
       {isReadyToInstall && (
         <Surface level={1} style={{ padding: 22, marginBottom: 18 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>

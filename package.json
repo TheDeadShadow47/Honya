@@ -16,7 +16,7 @@
     "cheerio": "^1.2.0",
     "dayjs": "^1.11.21",
     "expo": "~54.0.0",
-    "expo-background-fetch": "~14.0.9",
+    "expo-background-task": "~1.0.10",
     "expo-blur": "~15.0.0",
     "expo-constants": "~18.0.0",
     "expo-dev-client": "~6.0.21",

@@ -20,8 +20,6 @@ import { showToast } from '../../lib/toast';
 const DEFAULT_FILTERS = { downloaded: false, unread: false };
 const DEFAULT_DISPLAY = { sourceTitle: false, chapterNumber: false };
 
-// Throttle auto-refetch per novel so rapid open → back → open doesn't hit the network; manual refresh bypasses it.
-
 export default function NovelDetailsScreen() {
   const { id } = useLocalSearchParams();
   const novelId = decodeNavParam(id);
@@ -51,7 +49,7 @@ export default function NovelDetailsScreen() {
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
-  // Last-persisted snapshot, seeded from the restored state; only written to AsyncStorage when settings actually change.
+  // Only written to storage when the settings actually change.
   const savedPrefsRef = useRef(
     JSON.stringify({
       filters: initialPrefs?.filters ?? DEFAULT_FILTERS,
@@ -68,7 +66,6 @@ export default function NovelDetailsScreen() {
     saveChapterPrefs(novelId, next);
   }, [filters, sortKey, display, novelId]);
 
-  // Refresh spinner; the ref guard prevents a second request while one is in flight.
   const [refreshing, setRefreshing] = useState(false);
   const refreshingRef = useRef(false);
 
@@ -158,9 +155,7 @@ export default function NovelDetailsScreen() {
     };
   }, [novelId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reload chapters when the screen regains focus (e.g. returning from the
-  // reader after marking chapters as read). Without this the in-memory chapter
-  // list is stale and the unread filter shows incorrect results.
+  // Reload chapters on focus — the reader screen changes read state.
   useFocusEffect(
     useCallback(() => {
       if (!novelId || !chaptersLoaded) return;
@@ -169,8 +164,6 @@ export default function NovelDetailsScreen() {
       }).catch(() => {});
     }, [novelId, chaptersLoaded]),
   );
-
-  /* ---------- derived chapter data (computed once per input change) ---------- */
 
   // Filter, then sort; display preferences apply at render time so toggling them never re-sorts thousands of rows.
   const visibleChapters = useMemo(() => {
@@ -187,7 +180,7 @@ export default function NovelDetailsScreen() {
     return sorted;
   }, [chapters, filters, sortKey]);
 
-  // Resume target: last unfinished chapter, else first unread; uses only the existing reading-progress columns.
+  // Resume target: last unfinished chapter, else first unread.
   const { resumeChapter, resumeIsContinue } = useMemo(() => {
     let inProgress = null;
     let firstUnread = null;
@@ -209,16 +202,13 @@ export default function NovelDetailsScreen() {
   const manageActive = filtersActive || sortKey !== 'numberAsc' || display.sourceTitle || display.chapterNumber;
   const sourceName = novel?.pluginId ? installedExtensions[novel.pluginId]?.name : undefined;
 
-  // Lookup for O(selection size) instead of O(chapter count) below — matters on
-  // novels with thousands of chapters where only a handful are ever selected.
+  // Map for O(selection-size) lookups on huge chapter lists.
   const chaptersById = useMemo(() => {
     const map = new Map();
     for (const c of chapters) map.set(c.id, c);
     return map;
   }, [chapters]);
 
-  // Which bulk actions actually apply to the current selection — e.g. "Remove
-  // download" only makes sense if at least one selected chapter is downloaded.
   const selectionFlags = useMemo(() => {
     let canDownload = false;
     let canRemoveDownload = false;
@@ -279,9 +269,7 @@ export default function NovelDetailsScreen() {
 
   /* ---------- one-tap range actions ---------- */
 
-  // Selects every displayed chapter that ISN'T already selected — with 1 chapter
-  // selected that's "all except this one"; with several it's "all except selected".
-  // No separate anchor needed: the current selection itself is the exclusion set.
+  // Selects everything except the currently selected chapters ("all but these").
   const selectAllExcept = useCallback(() => {
     const excluded = selectedRef.current;
     const next = new Set(visibleRef.current.filter((c) => !excluded.has(c.id)).map((c) => c.id));
@@ -322,8 +310,7 @@ export default function NovelDetailsScreen() {
     [router, toggleSelect],
   );
 
-  // Long-press enters selection with that chapter selected; while already selecting,
-  // it just toggles that chapter — selection tools work off the whole set from here.
+  // Long-press starts selection with that chapter; tapping again just toggles it.
   const longPressChapter = useCallback(
     (chapter) => {
       if (!selectingRef.current) {
@@ -365,18 +352,15 @@ export default function NovelDetailsScreen() {
     [removeDownload, reload, t],
   );
 
-  /* ---------- bulk actions (existing functionality only) ---------- */
+  /* ---------- bulk actions ---------- */
 
   const bulkDownload = useCallback(async () => {
-    // Skip already-downloaded chapters so the queue only gets what's actually missing.
     const list = selectedChapters().filter((c) => !c.downloaded);
     if (!list.length) {
       Alert.alert(t('md3.somethingWentWrong'), t('settingsStorage.cleanupSubtitle'));
       return;
     }
     const count = list.length;
-    // Selection exits right away — the queue (lib/downloadQueue.js) owns the operation from here.
-    // Each row's own spinner/clock icon (via downloadStates) shows real progress independently.
     exitSelect();
     await downloadMany(list);
     if (cancelledRef.current) return;
