@@ -92,7 +92,7 @@ function SelectionBar({
         <Text style={{ color: theme.text, fontWeight: '800', fontSize: 16, flex: 1, marginLeft: 6 }}>
           {t('selection.selected', { count })}
         </Text>
-        <Text style={{ color: theme.textMuted, fontSize: 12 }}>{t('selection.ofN', { count: total, plural: total === 1 ? '' : 's' })}</Text>
+        <Text style={{ color: theme.textMuted, fontSize: 12 }}>{t('selection.ofN', { count, total })}</Text>
       </View>
 
       {/* Available the moment selection starts — a single selected chapter is
