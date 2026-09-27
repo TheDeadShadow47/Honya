@@ -18,6 +18,7 @@ import { handleNotificationAction as handleUpdateAction } from '../lib/libraryUp
 import Toast from '../components/Toast';
 import WhatsNew from '../components/WhatsNew';
 import NotificationPermissionPrompt from '../components/NotificationPermissionPrompt';
+import StarterGuide from '../components/StarterGuide';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -25,6 +26,7 @@ export default function RootLayout() {
   const ready = useStore((s) => s.ready);
   const hydrate = useStore((s) => s.hydrate);
   const lang = useStore((s) => s.prefs.lang);
+  const showStarterGuide = useStore((s) => s.showStarterGuide);
   const theme = useAppTheme();
   const isDark = isThemeDark(theme);
   const { t } = useI18n();
@@ -117,7 +119,11 @@ export default function RootLayout() {
         )}
         {ready ? <Toast /> : null}
         {ready ? <WhatsNew onDone={() => setReadyForNotifPrompt(true)} /> : null}
-        {ready && readyForNotifPrompt ? <NotificationPermissionPrompt /> : null}
+        {/* showStarterGuide starts null (undecided) until hydrate() resolves it, so we wait
+            rather than briefly showing NotificationPermissionPrompt and then swapping to
+            StarterGuide (or vice versa) on a fresh install. */}
+        {ready && readyForNotifPrompt && showStarterGuide === true ? <StarterGuide /> : null}
+        {ready && readyForNotifPrompt && showStarterGuide === false ? <NotificationPermissionPrompt /> : null}
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

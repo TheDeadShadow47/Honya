@@ -14,6 +14,7 @@ import * as updateManager from '../lib/updateManager';
 
 const PREFS_KEY = '@honya/prefs';
 const REPOS_KEY = '@honya/repos';
+const STARTER_GUIDE_KEY = '@honya/starterGuideCompleted';
 
 const LEGACY_KEY_MAP = {
   '@shosetsu/prefs': PREFS_KEY,
@@ -76,6 +77,10 @@ export const useStore = create((set, get) => ({
   updateProgress: { running: false, current: 0, total: 0, novelTitle: null },
   updateSummary: { lastUpdateAt: null, checked: 0, updated: 0, newChapters: 0, failed: [] },
   appUpdateState: updateManager.getState(),
+  // null = not yet determined (see hydrate()); true/false once decided. RootLayout waits
+  // for a definite boolean before showing either the Starter Guide or the notification
+  // prompt, so the two never race/flash in the wrong order.
+  showStarterGuide: null,
 
   hydrate: async () => {
     await db.initDatabase();
@@ -102,6 +107,31 @@ export const useStore = create((set, get) => ({
     await get().refreshLibrary();
     await get().refreshUpdates();
     await get().refreshHistory();
+
+    // Starter Guide first-launch decision. There's no existing "fresh install" signal in
+    // Honya, and the persisted flag itself is brand new in this release, so its mere
+    // absence can't tell a genuinely new install apart from an existing v1.4.1+ user
+    // upgrading into this version (both would have it absent on their very first v1.4.2
+    // hydrate). Decide once, using real local usage as the signal, and persist the
+    // decision immediately so this heuristic never runs again on this device.
+    try {
+      const guideRaw = await AsyncStorage.getItem(STARTER_GUIDE_KEY);
+      if (guideRaw != null) {
+        set({ showStarterGuide: JSON.parse(guideRaw) !== true });
+      } else {
+        const looksAlreadyUsed =
+          get().library.length > 0 ||
+          repos.length > 0 ||
+          Object.keys(installedExtensions).length > 0;
+        const shouldShow = !looksAlreadyUsed;
+        set({ showStarterGuide: shouldShow });
+        await AsyncStorage.setItem(STARTER_GUIDE_KEY, JSON.stringify(!shouldShow));
+      }
+    } catch {
+      // If anything above fails, default to not showing the guide rather than risking
+      // repeatedly prompting an existing user due to a storage/read error.
+      set({ showStarterGuide: false });
+    }
 
     downloadQueue.subscribe((snapshot) => {
       set({ downloadQueueState: snapshot, downloadStates: snapshot.states });
@@ -137,6 +167,14 @@ export const useStore = create((set, get) => ({
   resetPrefs: async () => {
     set({ prefs: DEFAULT_PREFS });
     await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(DEFAULT_PREFS));
+  },
+
+  /* starter guide */
+  completeStarterGuide: async () => {
+    set({ showStarterGuide: false });
+    try {
+      await AsyncStorage.setItem(STARTER_GUIDE_KEY, JSON.stringify(true));
+    } catch {}
   },
 
   /* repositories  */
