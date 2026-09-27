@@ -20,6 +20,11 @@ import { showToast } from '../../lib/toast';
 const DEFAULT_FILTERS = { downloaded: false, unread: false };
 const DEFAULT_DISPLAY = { sourceTitle: false, chapterNumber: false };
 
+// Same classification the reader screen uses for a failed network request — a connectivity
+// problem, not a real content/parsing error. Kept local (rather than shared) so this fix
+// doesn't touch the already-working reader screen.
+const OFFLINE_RE = /Network request failed|Failed to fetch|fetch failed|Network is unreachable|Unable to resolve host|ENETUNREACH|ECONNRESET|ECONNREFUSED|timeout|timed out/i;
+
 export default function NovelDetailsScreen() {
   const { id } = useLocalSearchParams();
   const novelId = decodeNavParam(id);
@@ -82,7 +87,7 @@ export default function NovelDetailsScreen() {
   }, [novelId]);
 
   const fetchRemote = useCallback(
-    async (base) => {
+    async (base, { silent = false } = {}) => {
       const record = base?.pluginId ? installedExtensions[base.pluginId] : null;
       if (!record || !base?.path) return;
       if (cancelledRef.current) return;
@@ -118,7 +123,17 @@ export default function NovelDetailsScreen() {
         await refreshUpdates();
         markFetched(novelId);
       } catch (e) {
-        if (!cancelledRef.current) Alert.alert(t('novel.couldNotLoad'), e.message);
+        if (cancelledRef.current) return;
+        // Offline and local data (the novel record + whatever chapters are downloaded)
+        // is already on screen — a network-resolution failure here isn't a reason to
+        // interrupt reading, just a reason to keep using what's already local. A manual
+        // refresh still gets a lightweight, non-blocking heads-up; the automatic
+        // background refresh on open stays silent so it doesn't nag on every offline open.
+        if (OFFLINE_RE.test(String(e?.message ?? ''))) {
+          if (!silent) showToast(t('novel.offlineUsingLocal'));
+          return;
+        }
+        Alert.alert(t('novel.couldNotLoad'), e.message);
       }
     },
     [installedExtensions, novelId, reload, refreshUpdates, t],
@@ -145,8 +160,10 @@ export default function NovelDetailsScreen() {
       setChapters(list);
       setChaptersLoaded(true);
       // Skip the network round-trip within the throttle window so rapid open → back → open doesn't re-clog the DB queue.
+      // Silent: local data is already rendered above, so a failed background refresh
+      // (e.g. no network) shouldn't interrupt with a dialog — see fetchRemote.
       if (base && shouldFetch(novelId)) {
-        fetchRemote(base);
+        fetchRemote(base, { silent: true });
       }
     })();
     return () => {

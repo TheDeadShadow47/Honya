@@ -12,7 +12,7 @@ A minimal, offline-first novel reader built with **React Native and Expo**, feat
 ![Expo](https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white)
 ![Zustand](https://img.shields.io/badge/Zustand-433E38?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-1.4.0-ED8DB0?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.4.2-ED8DB0?style=for-the-badge)
 
 [![Download APK](https://img.shields.io/badge/Download-APK-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/TheDeadShadow47/Honya/releases)
 
@@ -41,12 +41,14 @@ Under the hood, Honya pairs an LNReader-compatible plugin engine with a hand-rol
 ## ✨ Features
 
 - 📜 **Continuous scrolling reader** — chapters load automatically as you scroll, no "Next" button required
+- 🔊 **Text-to-speech** — listen to the chapter you're reading with the device's native speech engine, with pause / resume and progress tracking
 - 📥 **Reliable background downloads** — long download batches keep processing even when Honya is in the background, and stay in sync with Download Manager
 - ⬇️ **Download Manager** — track, pause, and cancel queued chapter downloads
 - 📶 **Offline reading** — read downloaded chapters without a connection; progress saved locally via SQLite
 - 🔄 **Automatic & manual library updates** — keep your library in sync with the latest chapters, smooth even for large libraries
 - 🔔 **Notifications** — download / update progress and results, keeping background activity visible without requiring the app to stay open
 - 🕐 **In-app updates** — check for new versions, download updates, and launch the Android installation flow from inside Honya
+- 🧭 **Starter Guide** — a skippable onboarding tour on first launch, with inline setup for backups, repositories, and theme
 - 🔖 **Per-chapter progress** — scroll position and read status tracked per chapter
 - ✅ **Advanced chapter selection** — long-press for bulk download, mark, or remove
 - 🔍 **Filter / sort / display** — downloaded-unread filters, sort by number or date, toggle row metadata
@@ -60,6 +62,17 @@ Under the hood, Honya pairs an LNReader-compatible plugin engine with a hand-rol
 - 🌍 **Five languages** — English, Français, العربية, Deutsch, and Italiano, with Arabic RTL support
 - 🚀 **Performance tuned** — smooth and responsive even with large libraries and long chapter lists
 - 🚫 **No default sources** — every extension is user-provided, nothing runs until you install it
+
+---
+
+## 🆕 What's New in 1.4.2
+
+- 🔊 **Listen — text-to-speech in the reader** — any chapter can now be read aloud with the device's native speech engine. Pause and resume mid-chapter, watch a "Reading _n_ of _m_" indicator, and rely on paragraph-aware chunking so long chapters are never cut off mid-sentence.
+- 🧭 **Starter Guide** — new installs get a short, fully skippable tour that walks through backups, plugin repositories, notifications, themes, and the library, with one-tap setup actions inline. Existing installs are detected automatically and never see it.
+- 🕐 **Background update checks** — Honya now also checks for new releases from an OS-scheduled background task and quietly notifies you when one is available, on top of the existing foreground check. Still throttled to once a day; downloading and installing remain user-initiated.
+- 🩹 **Updater fixes** — the update manager reconciles its saved state against the version that is actually running, so a just-installed update no longer lingers as "ready to install", and obsolete downloaded APKs are cleaned up.
+- 📶 **Quieter offline handling** — opening a novel with no connection now keeps the local record and downloaded chapters on screen with a light notice, instead of a blocking error dialog.
+- ✨ **Cleaner chapter text** — stray `undefined` tokens that some plugins accidentally glue into chapter prose (a string-concatenation bug on their side) are stripped before the text is displayed or spoken.
 
 ---
 
@@ -142,11 +155,13 @@ app/
     history.js                Recently read chapters
     catalogs.js               Installed extensions + global search
     more.js                   Link-out to settings screens
+  downloads.js                Download manager — queued, running, failed jobs
   novel/
     [id].js                   Novel detail — cover, summary, chapter list
     migrate.js                Import-migrate screen (for LNReader data)
   reader/
-    [chapterId].js            Reader screen — segmented text, scroll progress, offline fallback
+    [chapterId].js            Reader screen — segmented text, scroll progress,
+                              offline fallback, text-to-speech playback
   browse/
     [pluginId].js             Extension browse/search screen
   settings/
@@ -155,7 +170,10 @@ app/
     language.js
     theme.js
     reader.js
+    notifications.js
     storage.js
+    backup.js
+    update.js
     about.js
 
 components/
@@ -165,12 +183,17 @@ components/
   BottomSheet.js              Reusable animated bottom sheet (native driver)
   ChapterManageSheet.js       Filter / Sort / Display tabs for the chapter list
   ChapterRow.js               Memoized chapter row (read dot, progress bar, download btn)
+  ContinueReading.js          "Continue reading" card for the Library screen
   Cover.js                    Image cover with loading / error fallback
   HistoryRow.js               Single row in the history list
   NovelCard.js                Grid card for library/catalog items
   NovelHeader.js              Novel detail header (cover + metadata + resume button)
+  NotificationPermissionPrompt.js  First-run Android 13+ notification permission ask
   Ripple.js                   Touch-feedback wrapper
   SelectionBar.js             Contextual app bar during chapter multi-select
+  StarterGuide.js             First-run onboarding tour (8 steps, skippable)
+  Toast.js                    Snackbar-style toast host
+  WhatsNew.js                 "What's new" release-notes sheet after an update
 
 db/
   database.js                 SQLite wrapper — init, schema, all CRUD for novels,
@@ -183,19 +206,28 @@ hooks/
 lib/
   pluginEngine.js             LNReader-compatible sandboxed new Function runtime
   repository.js               fetchRepository() + normalizePlugin()
-  clean.js                    HTML → plain-text strip + entity decode
+  clean.js                    HTML → plain-text strip, entity decode, stray-token cleanup
   chapterPrefs.js             Per-novel filter/sort/display persistence
   chapterMatch.js             Chapter ID matching helpers
   migrate.js                  LNReader data migration utility
-  time.js                    groupByDay() + relativeTime() formatting
-  i18n.js                    Translation lookup (en/ar/fr/de/it), RTL detection
-  navIds.js                  Encodes/decodes novel/chapter IDs for navigation
-  locales/                   Per-language translation tables (en, ar, fr, de, it)
-  downloadQueue.js           Background download queue manager (persistent, sequential)
-  libraryUpdate.js           Manual + automatic library update coordinator
-  notifications.js           Notification channels, prefs, and send helper
-  updateManager.js           In-app update checker + APK download/install
-  backgroundTasks.js         Registered background task handlers
+  time.js                     groupByDay() + relativeTime() formatting
+  i18n.js                     Translation lookup (en/ar/fr/de/it), RTL detection
+  navIds.js                   Encodes/decodes novel/chapter IDs for navigation
+  locales/                    Per-language translation tables (en, ar, fr, de, it)
+  downloadQueue.js            Background download queue manager (persistent, sequential)
+  backgroundDownload.js       Headless worker that drains the download queue
+  libraryUpdate.js            Manual + automatic library update coordinator
+  notifications.js            Notification channels, prefs, and send helper
+  backgroundTasks.js          Registered background task handlers
+  updateManager.js            In-app update checker, APK download/install, self-update task
+  backup.js                   Backup archive create / inspect / restore
+  starterGuide.js             First-run detection + Starter Guide completion state
+  tts.js                      Text-to-speech session state (play / pause / resume / stop)
+  ttsChunk.js                 Pure chunking logic that splits text into speech-sized pieces
+  novelFetchThrottle.js       Per-novel network-fetch throttle
+  readerContext.js            Shared reader state (scroll position, TTS session)
+  nativeSupport.js            Platform capability checks
+  toast.js                    Imperative toast API
 
 store/
   useStore.js                 Zustand store — prefs, repos, extensions, library,
@@ -281,6 +313,7 @@ The app has no default repositories — every source is user-provided.
 - **AsyncStorage prefs** — user preferences (theme, reader settings, repository list) persisted as JSON
 - **Chapter-prefs cache** — per-novel filter/sort/display settings loaded synchronously on mount to avoid a flash of defaults
 - **Storage management** — Settings → Storage screen shows database size, per-table row counts, and a clear-downloads button
+- **Backup / restore** — Settings → Backup writes a single archive of the library, chapters, and reading progress, and restores it in place
 
 ---
 
@@ -293,8 +326,12 @@ The app has no default repositories — every source is user-provided.
 | Language | Switch the UI between English, العربية, Français, Deutsch, and Italiano |
 | Theme | Pick one of 15 color themes |
 | Reader settings | Font size, line height, padding, background |
+| Downloads | Queued, running, and failed chapter downloads |
+| Notifications | Per-channel toggles for download / update progress |
 | Storage | Database stats, clear downloaded chapters |
-| About | App version and license |
+| Backup | Create and restore full library + progress backups |
+| About | App version, update status, and license |
+| Update | Check for, download, and install app updates |
 
 ---
 
@@ -303,7 +340,6 @@ The app has no default repositories — every source is user-provided.
 Potential additions include:
 
 - Additional built-in themes
-- Backup / restore for library and progress
 - Reading statistics
 - Custom plugin repository health checks
 - Tablet-optimized layouts

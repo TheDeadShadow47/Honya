@@ -14,6 +14,7 @@ import { setPendingReader, takePendingReader } from '../../lib/readerContext';
 import { RADIUS, READER_BACKGROUNDS } from '../../theme/theme';
 import { isArabicText } from '../../lib/i18n';
 import Ripple from '../../components/Ripple';
+import * as tts from '../../lib/tts';
 
 const OFFLINE_RE = /Network request failed|Failed to fetch|fetch failed|Network is unreachable|Unable to resolve host|ENETUNREACH|ECONNRESET|ECONNREFUSED|timeout|timed out/i;
 
@@ -656,6 +657,39 @@ export default function ReaderScreen() {
     if (settingsOpen) setSettingsOpen(false);
   }, [settingsOpen]);
 
+  /* ---------- text-to-speech ("Listen") ---------- */
+
+  const [ttsState, setTtsState] = useState(() => tts.getState());
+  useEffect(() => tts.subscribe(setTtsState), []);
+
+  // A hard chapter switch (prev/next, or leaving the reader) always stops any active
+  // session — TTS is scoped to one chapter at a time, per the MVP scope.
+  useEffect(() => {
+    return () => tts.stop();
+  }, [id]);
+
+  const listeningHere = ttsState.sessionKey === activeId;
+
+  const onToggleListen = useCallback(() => {
+    if (listeningHere && ttsState.playing) {
+      tts.pause();
+      return;
+    }
+    if (listeningHere && ttsState.total > 0) {
+      tts.resume();
+      return;
+    }
+    const seg = activeSeg;
+    if (!seg?.text) return;
+    try {
+      tts.play(seg.id, seg.text, { language: seg.rtl ? 'ar' : undefined, rate: 1.0 });
+    } catch {
+      Alert.alert(t('reader.listen'), t('reader.ttsUnavailable'));
+    }
+  }, [listeningHere, ttsState.playing, ttsState.total, activeSeg, t]);
+
+  const onStopListen = useCallback(() => tts.stop(), []);
+
   return (
     <View style={{ flex: 1, backgroundColor: palette.bg }}>
       <StatusBar hidden={!uiVisible} />
@@ -779,12 +813,55 @@ export default function ReaderScreen() {
             )}
           </View>
         </Ripple>
+        <Ripple onPress={onToggleListen} borderless>
+          <View style={{ padding: 10 }}>
+            <Ionicons
+              name={listeningHere && ttsState.playing ? 'pause' : 'headset-outline'}
+              size={20}
+              color={palette.fg}
+            />
+          </View>
+        </Ripple>
         <Ripple onPress={() => load(true)} borderless>
           <View style={{ padding: 10 }}>
             <Ionicons name="refresh" size={20} color={palette.fg} />
           </View>
         </Ripple>
       </Animated.View>
+
+      {listeningHere && (ttsState.playing || ttsState.total > 0) && (
+        <View
+          pointerEvents="box-none"
+          style={{
+            position: 'absolute',
+            left: 12,
+            right: 12,
+            bottom: insets.bottom + 78,
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: palette.bg + 'f2',
+            borderRadius: RADIUS.lg,
+            paddingVertical: 8,
+            paddingHorizontal: 10,
+            borderWidth: 1,
+            borderColor: palette.fg + '22',
+          }}
+        >
+          <Ripple onPress={onToggleListen} borderless>
+            <View style={{ padding: 8 }}>
+              <Ionicons name={ttsState.playing ? 'pause' : 'play'} size={20} color={palette.fg} />
+            </View>
+          </Ripple>
+          <Text numberOfLines={1} style={{ flex: 1, marginHorizontal: 6, color: palette.fg, opacity: 0.75, fontSize: 12 }}>
+            {t('reader.listeningProgress', { index: Math.min(ttsState.index + 1, ttsState.total), total: ttsState.total })}
+          </Text>
+          <Ripple onPress={onStopListen} borderless>
+            <View style={{ padding: 8 }}>
+              <Ionicons name="close" size={20} color={palette.fg} />
+            </View>
+          </Ripple>
+        </View>
+      )}
 
       <Animated.View
         pointerEvents={uiVisible ? 'auto' : 'none'}
