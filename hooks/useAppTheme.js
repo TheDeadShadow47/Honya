@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
 import { useStore } from '../store/useStore';
-import { THEMES } from '../theme/theme';
+import { resolveActivePalette } from '../theme/palette';
 
 export function useAppTheme() {
+  const appearance = useStore((s) => s.prefs.appearance);
   const themeKey = useStore((s) => s.prefs.theme);
-  return useMemo(() => THEMES[themeKey] ?? THEMES.dark, [themeKey]);
+  return resolveActivePalette(appearance, themeKey);
 }

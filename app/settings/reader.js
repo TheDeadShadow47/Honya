@@ -5,7 +5,8 @@ import { useAppTheme } from '../../hooks/useAppTheme';
 import { useI18n } from '../../hooks/useI18n';
 import { Chip, SectionLabel, Surface } from '../../components/MD3';
 import Ripple from '../../components/Ripple';
-import { RADIUS, READER_BACKGROUNDS } from '../../theme/theme';
+import { RADIUS } from '../../theme/theme';
+import { READER_BACKGROUND_OPTIONS, resolveReaderBackground } from '../../theme/palette';
 
 export default function ReaderSettingsScreen() {
   const theme = useAppTheme();
@@ -15,36 +16,40 @@ export default function ReaderSettingsScreen() {
   return (
     <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
       <SectionLabel>{t('settingsReader.background')}</SectionLabel>
-      <Surface level={1} style={{ padding: 16, marginBottom: 18, flexDirection: 'row', gap: 12 }}>
-        {READER_BACKGROUNDS.map((b) => (
-          <Ripple key={b.key} onPress={() => setPref('readerBackground', b.key)}>
-            <View style={{ alignItems: 'center', gap: 6 }}>
-              <View
-                style={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: RADIUS.md,
-                  backgroundColor: b.bg,
-                  borderWidth: prefs.readerBackground === b.key ? 2 : 1,
-                  borderColor: prefs.readerBackground === b.key ? theme.primary : theme.outline,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Text style={{ color: b.fg, fontWeight: '800' }}>Aa</Text>
+      <Surface level={1} style={{ padding: 16, marginBottom: 18, flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        {READER_BACKGROUND_OPTIONS.map((b) => {
+          const option = resolveReaderBackground(b.key, theme);
+          return (
+            <Ripple key={b.key} onPress={() => setPref('readerBackground', b.key)}>
+              <View style={{ alignItems: 'center', gap: 6 }}>
+                <View
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: RADIUS.md,
+                    backgroundColor: option.bg,
+                    borderWidth: prefs.readerBackground === b.key ? 2 : 1,
+                    borderColor: prefs.readerBackground === b.key ? theme.primary : theme.outline,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ color: option.fg, fontWeight: '800' }}>Aa</Text>
+                </View>
+                <Text
+                  style={{
+                    color: prefs.readerBackground === b.key ? theme.primary : theme.textMuted,
+                    fontSize: 11,
+                    fontWeight: '700',
+                    textAlign: 'center',
+                  }}
+                >
+                  {b.nameKey ? t(b.nameKey) : b.name}
+                </Text>
               </View>
-              <Text
-                style={{
-                  color: prefs.readerBackground === b.key ? theme.primary : theme.textMuted,
-                  fontSize: 11,
-                  fontWeight: '700',
-                }}
-              >
-                {b.name}
-              </Text>
-            </View>
-          </Ripple>
-        ))}
+            </Ripple>
+          );
+        })}
       </Surface>
 
       <SectionLabel>{t('settingsReader.readingMode')}</SectionLabel>

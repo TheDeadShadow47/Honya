@@ -28,7 +28,7 @@ export default function RootLayout() {
   const lang = useStore((s) => s.prefs.lang);
   const showStarterGuide = useStore((s) => s.showStarterGuide);
   const theme = useAppTheme();
-  const isDark = isThemeDark(theme);
+  const isDark = theme.isDark ?? isThemeDark(theme);
   const { t } = useI18n();
   const router = useRouter();
   // Gate the notification prompt behind What's New so the two never stack on a fresh install.

@@ -4,6 +4,8 @@ export const THEMES = {
     key: 'dark',
     name: 'Midnight',
     description: 'Balanced dark theme',
+    nameKey: 'theme.dark.name',
+    descriptionKey: 'theme.dark.description',
     background: '#101014',
     surface: '#17171d',
     surface1: '#1d1d25',
@@ -23,6 +25,8 @@ export const THEMES = {
     key: 'light',
     name: 'Daylight',
     description: 'Clean light theme',
+    nameKey: 'theme.light.name',
+    descriptionKey: 'theme.light.description',
     background: '#fdfbff',
     surface: '#ffffff',
     surface1: '#f4f1fa',
@@ -42,6 +46,8 @@ export const THEMES = {
     key: 'oled',
     name: 'Onyx',
     description: 'Pure black OLED',
+    nameKey: 'theme.oled.name',
+    descriptionKey: 'theme.oled.description',
     background: '#000000',
     surface: '#000000',
     surface1: '#0e0e12',
@@ -61,6 +67,8 @@ export const THEMES = {
     key: 'forest',
     name: 'Forest',
     description: 'Earthy green tones',
+    nameKey: 'theme.forest.name',
+    descriptionKey: 'theme.forest.description',
     background: '#0f1512',
     surface: '#131a16',
     surface1: '#18211c',
@@ -80,6 +88,8 @@ export const THEMES = {
     key: 'blossom',
     name: 'Blossom',
     description: 'Soft rose light',
+    nameKey: 'theme.blossom.name',
+    descriptionKey: 'theme.blossom.description',
     background: '#fff8f9',
     surface: '#ffffff',
     surface1: '#fdeef1',
@@ -99,6 +109,8 @@ export const THEMES = {
     key: 'honya',
     name: 'Honya Sakura',
     description: 'Pure black with sakura pink accents',
+    nameKey: 'theme.honya.name',
+    descriptionKey: 'theme.honya.description',
     background: '#000000',
     surface: '#000000',
     surface1: '#0a0a0f',
@@ -306,7 +318,9 @@ export const THEMES = {
 };
 
 export const isThemeDark = (t) => {
-  const hex = String(t.background ?? '#000000').replace('#', '');
+  if (t && typeof t.appearance === 'string') return t.appearance !== 'light';
+  if (typeof t?.isDark === 'boolean') return t.isDark;
+  const hex = String(t?.background ?? '#000000').replace('#', '');
   const r = parseInt(hex.slice(0, 2) || '0', 16);
   const g = parseInt(hex.slice(2, 4) || '0', 16);
   const b = parseInt(hex.slice(4, 6) || '0', 16);
@@ -353,8 +367,8 @@ export const alpha = (hex, a = 1) => {
   return `${hex}${v}`;
 };
 
-/** Theme names are fixed English and bypass i18n, so `t` is intentionally unused. */
-export const themeName = (t, theme) => theme.name;
+export const themeName = (t, theme) =>
+  theme.nameKey && typeof t === 'function' ? t(theme.nameKey) : theme.name;
 
 export const themeDescription = (t, theme) =>
-  theme.descriptionKey ? t(theme.descriptionKey) : theme.description;
+  theme.descriptionKey && typeof t === 'function' ? t(theme.descriptionKey) : theme.description;

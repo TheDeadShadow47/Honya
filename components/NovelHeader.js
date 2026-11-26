@@ -69,7 +69,7 @@ function NovelHeader({
         ) : (
           <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.surface2 }]} />
         )}
-        <BlurView intensity={55} tint={isThemeDark(theme) ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+        <BlurView intensity={55} tint={(theme.isDark ?? isThemeDark(theme)) ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
         <View style={[StyleSheet.absoluteFill, { backgroundColor: alpha(theme.background, 0.72) }]} />
 
         <View style={{ flex: 1, paddingTop: topInset + 4, paddingHorizontal: 16 }}>

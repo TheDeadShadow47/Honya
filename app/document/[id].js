@@ -9,7 +9,8 @@ import { useAppTheme } from '../../hooks/useAppTheme';
 import { useI18n } from '../../hooks/useI18n';
 import * as db from '../../db/database';
 import { decodeNavParam } from '../../lib/navIds';
-import { RADIUS, READER_BACKGROUNDS } from '../../theme/theme';
+import { RADIUS } from '../../theme/theme';
+import { isPaletteDark, READER_BACKGROUND_OPTIONS, resolveReaderBackground } from '../../theme/palette';
 import BottomSheet from '../../components/BottomSheet';
 import Ripple from '../../components/Ripple';
 import { Chip, Field } from '../../components/MD3';
@@ -41,7 +42,7 @@ export default function DocumentReaderScreen() {
   const prefs = useStore((s) => s.prefs);
   const setPref = useStore((s) => s.setPref);
   const refreshLibrary = useStore((s) => s.refreshLibrary);
-  const palette = READER_BACKGROUNDS.find((b) => b.key === prefs.readerBackground) ?? READER_BACKGROUNDS[1];
+  const palette = resolveReaderBackground(prefs.readerBackground, theme);
 
   const [novel, setNovel] = useState(null);
   const [doc, setDoc] = useState(null);
@@ -258,7 +259,7 @@ export default function DocumentReaderScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.bg }}>
-      <StatusBar hidden={!uiVisible} />
+      <StatusBar hidden={!uiVisible} style={isPaletteDark(palette) ? 'light' : 'dark'} />
 
       {isPdf ? (
         <PdfReader
@@ -432,25 +433,28 @@ export default function DocumentReaderScreen() {
           <Chip icon="swap-horizontal-outline" label={t('settingsReader.modePaged')} selected={paged} onPress={() => changeMode('paged')} />
         </View>
         <Text style={{ color: theme.text, fontWeight: '800', fontSize: 13, marginTop: 10 }}>{t('reader.background')}</Text>
-        <View style={{ flexDirection: 'row', gap: 12, marginTop: 10 }}>
-          {READER_BACKGROUNDS.map((b) => (
-            <Ripple key={b.key} onPress={() => setPref('readerBackground', b.key)}>
-              <View
-                style={{
-                  width: 46,
-                  height: 46,
-                  borderRadius: RADIUS.md,
-                  backgroundColor: b.bg,
-                  borderWidth: prefs.readerBackground === b.key ? 2 : 1,
-                  borderColor: prefs.readerBackground === b.key ? theme.primary : theme.outline,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Text style={{ color: b.fg, fontWeight: '800' }}>A</Text>
-              </View>
-            </Ripple>
-          ))}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 10 }}>
+          {READER_BACKGROUND_OPTIONS.map((b) => {
+            const option = resolveReaderBackground(b.key, theme);
+            return (
+              <Ripple key={b.key} onPress={() => setPref('readerBackground', b.key)}>
+                <View
+                  style={{
+                    width: 46,
+                    height: 46,
+                    borderRadius: RADIUS.md,
+                    backgroundColor: option.bg,
+                    borderWidth: prefs.readerBackground === b.key ? 2 : 1,
+                    borderColor: prefs.readerBackground === b.key ? theme.primary : theme.outline,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ color: option.fg, fontWeight: '800' }}>A</Text>
+                </View>
+              </Ripple>
+            );
+          })}
         </View>
         {isPdf ? (
           <Text style={{ color: theme.textMuted, fontSize: 12.5, marginTop: 14, lineHeight: 18 }}>{t('document.pdfSettingsNote')}</Text>

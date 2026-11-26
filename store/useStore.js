@@ -6,6 +6,13 @@ import { fetchRepository, fetchPluginCode } from '../lib/repository';
 import { loadPlugin, pluginApi, unloadPlugin } from '../lib/pluginEngine';
 import { loadChapterPrefs, getChapterPrefsSnapshot, restoreChapterPrefsSnapshot, CHAPTER_PREFS_KEY } from '../lib/chapterPrefs';
 import { setLanguage, applyDirection } from '../lib/i18n';
+import {
+  DEFAULT_APPEARANCE_KEY,
+  DEFAULT_THEME_KEY,
+  isAppearanceKey,
+  isThemeKey,
+  normalizeThemePrefs,
+} from '../theme/palette';
 import * as backup from '../lib/backup';
 import * as downloadQueue from '../lib/downloadQueue';
 import * as libraryUpdate from '../lib/libraryUpdate';
@@ -41,7 +48,8 @@ async function migrateLegacyStorageKeys() {
 }
 
 export const DEFAULT_PREFS = {
-  theme: 'honya',
+  theme: DEFAULT_THEME_KEY,
+  appearance: DEFAULT_APPEARANCE_KEY,
   lang: 'en',
   readerBackground: 'black',
   fontSize: 18,
@@ -92,7 +100,12 @@ export const useStore = create((set, get) => ({
     let prefs = DEFAULT_PREFS;
     let repos = [];
     try {
-      prefs = { ...DEFAULT_PREFS, ...JSON.parse(prefsRaw[1] || '{}') };
+      const saved = JSON.parse(prefsRaw[1] || '{}');
+      const merged = { ...DEFAULT_PREFS, ...(saved && typeof saved === 'object' ? saved : {}) };
+      prefs = normalizeThemePrefs(merged);
+      if (prefs.theme !== merged.theme || prefs.appearance !== merged.appearance) {
+        AsyncStorage.setItem(PREFS_KEY, JSON.stringify(prefs)).catch(() => {});
+      }
     } catch {}
     try {
       repos = JSON.parse(reposRaw[1] || '[]');
@@ -162,6 +175,8 @@ export const useStore = create((set, get) => ({
   },
 
   setPref: async (key, value) => {
+    if (key === 'theme' && !isThemeKey(value)) return;
+    if (key === 'appearance' && !isAppearanceKey(value)) return;
     const prefs = { ...get().prefs, [key]: value };
     set({ prefs });
     await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
@@ -360,8 +375,24 @@ export const useStore = create((set, get) => ({
     await db.restoreLibrarySnapshot(parsed.novels);
     await restoreChapterPrefsSnapshot(parsed.chapterPrefs);
 
+    const backupHasTheme = Object.prototype.hasOwnProperty.call(safePrefs, 'theme');
+    const backupHasAppearance = Object.prototype.hasOwnProperty.call(safePrefs, 'appearance');
+    const restoredAppearance =
+      backupHasTheme || backupHasAppearance
+        ? normalizeThemePrefs({
+            theme: backupHasTheme ? safePrefs.theme : get().prefs.theme,
+            ...(backupHasAppearance ? { appearance: safePrefs.appearance } : {}),
+          })
+        : { theme: get().prefs.theme, appearance: get().prefs.appearance };
+
     const mergedRepos = Array.from(new Set([...get().userRepositories, ...parsed.repositories]));
-    const mergedPrefs = { ...DEFAULT_PREFS, ...get().prefs, ...safePrefs };
+    const mergedPrefs = {
+      ...DEFAULT_PREFS,
+      ...get().prefs,
+      ...safePrefs,
+      theme: restoredAppearance.theme,
+      appearance: restoredAppearance.appearance,
+    };
     await AsyncStorage.setItem(REPOS_KEY, JSON.stringify(mergedRepos));
     await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(mergedPrefs));
 

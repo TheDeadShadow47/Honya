@@ -6,12 +6,14 @@ import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
 import { useI18n } from '../../hooks/useI18n';
+import { useAppTheme } from '../../hooks/useAppTheme';
 import * as db from '../../db/database';
 import { loadPlugin, pluginApi } from '../../lib/pluginEngine';
 import { sanitizeChapter } from '../../lib/clean';
 import { decodeNavParam, encodeNavParam } from '../../lib/navIds';
 import { setPendingReader, takePendingReader } from '../../lib/readerContext';
-import { RADIUS, READER_BACKGROUNDS } from '../../theme/theme';
+import { RADIUS } from '../../theme/theme';
+import { isPaletteDark, READER_BACKGROUND_OPTIONS, resolveReaderBackground } from '../../theme/palette';
 import { isArabicText } from '../../lib/i18n';
 import Ripple from '../../components/Ripple';
 import PagedReader from '../../components/PagedReader';
@@ -106,6 +108,7 @@ export default function ReaderScreen() {
   const ctx = bootCtxRef.current;
 
   const prefs = useStore((s) => s.prefs);
+  const appTheme = useAppTheme();
   const setPref = useStore((s) => s.setPref);
   const refreshLibrary = useStore((s) => s.refreshLibrary);
   const refreshHistory = useStore((s) => s.refreshHistory);
@@ -113,7 +116,7 @@ export default function ReaderScreen() {
   const downloadChapter = useStore((s) => s.downloadChapter);
   const removeDownload = useStore((s) => s.removeDownload);
 
-  const palette = READER_BACKGROUNDS.find((b) => b.key === prefs.readerBackground) ?? READER_BACKGROUNDS[1];
+  const palette = resolveReaderBackground(prefs.readerBackground, appTheme);
   // Infinite scroll stays the default; anything other than an explicit 'paged' preference is scroll.
   const paged = prefs.readingMode === 'paged';
 
@@ -754,7 +757,7 @@ export default function ReaderScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.bg }}>
-      <StatusBar hidden={!uiVisible} />
+      <StatusBar hidden={!uiVisible} style={isPaletteDark(palette) ? 'light' : 'dark'} />
 
       <View
         style={{ flex: 1 }}
@@ -1051,25 +1054,28 @@ export default function ReaderScreen() {
         </View>
 
         <Text style={{ color: palette.fg, fontWeight: '800', fontSize: 13, marginTop: 18 }}>{t('reader.background')}</Text>
-        <View style={{ flexDirection: 'row', gap: 12, marginTop: 10 }}>
-          {READER_BACKGROUNDS.map((b) => (
-            <Ripple key={b.key} onPress={() => setPref('readerBackground', b.key)}>
-              <View
-                style={{
-                  width: 46,
-                  height: 46,
-                  borderRadius: RADIUS.md,
-                  backgroundColor: b.bg,
-                  borderWidth: prefs.readerBackground === b.key ? 2 : 1,
-                  borderColor: prefs.readerBackground === b.key ? palette.fg : palette.fg + '33',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Text style={{ color: b.fg, fontWeight: '800' }}>A</Text>
-              </View>
-            </Ripple>
-          ))}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 10 }}>
+          {READER_BACKGROUND_OPTIONS.map((b) => {
+            const option = resolveReaderBackground(b.key, appTheme);
+            return (
+              <Ripple key={b.key} onPress={() => setPref('readerBackground', b.key)}>
+                <View
+                  style={{
+                    width: 46,
+                    height: 46,
+                    borderRadius: RADIUS.md,
+                    backgroundColor: option.bg,
+                    borderWidth: prefs.readerBackground === b.key ? 2 : 1,
+                    borderColor: prefs.readerBackground === b.key ? palette.fg : palette.fg + '33',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ color: option.fg, fontWeight: '800' }}>A</Text>
+                </View>
+              </Ripple>
+            );
+          })}
         </View>
 
         <Text style={{ color: palette.fg, fontWeight: '800', fontSize: 13, marginTop: 18 }}>
