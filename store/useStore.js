@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { deleteDocumentFiles } from '../lib/documents';
 import * as db from '../db/database';
 import { fetchRepository, fetchPluginCode } from '../lib/repository';
 import { loadPlugin, pluginApi, unloadPlugin } from '../lib/pluginEngine';
@@ -46,6 +47,8 @@ export const DEFAULT_PREFS = {
   fontSize: 18,
   lineHeight: 1.7,
   horizontalPadding: 20,
+  readingMode: 'scroll', // 'scroll' (infinite, default) | 'paged' (horizontal pages)
+  pageTurnAnimation: false, // paged mode only: paper page-curl instead of a plain swipe (opt-in)
   gridColumns: 3,
   markReadOnOpen: false,
   notificationsEnabled: true,
@@ -158,7 +161,6 @@ export const useStore = create((set, get) => ({
     await updateManager.initUpdateManager();
   },
 
-  /* preferences */
   setPref: async (key, value) => {
     const prefs = { ...get().prefs, [key]: value };
     set({ prefs });
@@ -169,7 +171,6 @@ export const useStore = create((set, get) => ({
     await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(DEFAULT_PREFS));
   },
 
-  /* starter guide */
   completeStarterGuide: async () => {
     set({ showStarterGuide: false });
     try {
@@ -177,7 +178,6 @@ export const useStore = create((set, get) => ({
     } catch {}
   },
 
-  /* repositories  */
   addRepository: async (url) => {
     const clean = url.trim();
     if (!/^https?:\/\//i.test(clean)) throw new Error('Enter a full http(s) URL');
@@ -214,7 +214,6 @@ export const useStore = create((set, get) => ({
     set({ repoCatalog: catalog, repoLoading: false, repoError: errors.join('\n') || null });
   },
 
-  /* extensions  */
   installExtension: async (meta) => {
     const code = await fetchPluginCode(meta.codeUrl);
     const record = { ...meta, code };
@@ -230,7 +229,6 @@ export const useStore = create((set, get) => ({
     set({ installedExtensions: next });
   },
 
-  /* global search  */
   globalSearch: async (query) => {
     const q = query.trim();
     const extensions = Object.values(get().installedExtensions);
@@ -302,7 +300,6 @@ export const useStore = create((set, get) => ({
   runLibraryUpdate: (opts) => libraryUpdate.runLibraryUpdate(opts),
   cancelLibraryUpdate: () => libraryUpdate.cancelLibraryUpdate(),
 
-  /* library  */
   refreshLibrary: async () => set({ library: await db.getLibrary() }),
   refreshUpdates: async () => set({ updates: await db.getRecentUpdates() }),
 
@@ -319,6 +316,13 @@ export const useStore = create((set, get) => ({
     const existing = await db.getNovel(novel.id);
     if (existing) await db.setInLibrary(novel.id, !existing.inLibrary);
     else await db.upsertNovel({ ...novel, inLibrary: true });
+    await get().refreshLibrary();
+  },
+  /** Deletes an imported EPUB/PDF: its files in app storage, reading data and bookmarks. */
+  removeDocument: async (novelId) => {
+    const doc = await db.getDocument(novelId);
+    await deleteDocumentFiles(doc);
+    await db.deleteNovel(novelId);
     await get().refreshLibrary();
   },
   removeFromLibraryHard: async (novelId) => {
@@ -372,7 +376,6 @@ export const useStore = create((set, get) => ({
     return parsed.meta;
   },
 
-  /* app update */
   checkForAppUpdate: (opts) => updateManager.checkForUpdates(opts),
   downloadAppUpdate: () => updateManager.downloadUpdate(),
   cancelAppUpdateDownload: () => updateManager.cancelDownload(),

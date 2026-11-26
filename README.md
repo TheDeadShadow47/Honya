@@ -12,7 +12,7 @@ A minimal, offline-first novel reader built with **React Native and Expo**, feat
 ![Expo](https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white)
 ![Zustand](https://img.shields.io/badge/Zustand-433E38?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-1.4.2-ED8DB0?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.5.0-ED8DB0?style=for-the-badge)
 
 [![Download APK](https://img.shields.io/badge/Download-APK-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/TheDeadShadow47/Honya/releases)
 
@@ -62,6 +62,16 @@ Under the hood, Honya pairs an LNReader-compatible plugin engine with a hand-rol
 - 🌍 **Five languages** — English, Français, العربية, Deutsch, and Italiano, with Arabic RTL support
 - 🚀 **Performance tuned** — smooth and responsive even with large libraries and long chapter lists
 - 🚫 **No default sources** — every extension is user-provided, nothing runs until you install it
+
+---
+
+## 🆕 What's New in 1.5.0
+
+- 📖 **Paged reading mode** — read one page at a time instead of endless scroll. Pages re-flow with your font size, spacing and padding, and work right-to-left for Arabic text. Continuous scroll is still the default.
+- 📄 **Local EPUB and PDF** — import books from your device and read them in the same reader, kept separate from online novels, backups and update checks.
+- 📜 **Optional page-turn animation** — in paged mode you can turn on a paper-style page curl: drag a page from its edge or corner and it rolls over like real paper (shaded rolled edge, faint show-through of the text on the back, a shadow on the page beneath), or tap to turn. It is **off by default**, only applies to paged mode, and is skipped when the system asks for reduced motion.
+- 🩹 **Steadier PDF scrolling** — fixed imported PDFs jumping or resetting while you scroll; pinch zoom and page jumps no longer reload the document.
+- 🖼️ **Covers for local books** — imported PDFs get their first page as a cover, and EPUBs without an embedded cover use artwork from their opening pages.
 
 ---
 

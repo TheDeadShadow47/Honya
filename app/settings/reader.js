@@ -3,7 +3,7 @@ import Slider from '@react-native-community/slider';
 import { useStore } from '../../store/useStore';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useI18n } from '../../hooks/useI18n';
-import { SectionLabel, Surface } from '../../components/MD3';
+import { Chip, SectionLabel, Surface } from '../../components/MD3';
 import Ripple from '../../components/Ripple';
 import { RADIUS, READER_BACKGROUNDS } from '../../theme/theme';
 
@@ -45,6 +45,41 @@ export default function ReaderSettingsScreen() {
             </View>
           </Ripple>
         ))}
+      </Surface>
+
+      <SectionLabel>{t('settingsReader.readingMode')}</SectionLabel>
+      <Surface level={1} style={{ padding: 16, marginBottom: 18 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+          <Chip
+            icon="swap-vertical-outline"
+            label={t('settingsReader.modeScroll')}
+            selected={prefs.readingMode !== 'paged'}
+            onPress={() => setPref('readingMode', 'scroll')}
+          />
+          <Chip
+            icon="swap-horizontal-outline"
+            label={t('settingsReader.modePaged')}
+            selected={prefs.readingMode === 'paged'}
+            onPress={() => setPref('readingMode', 'paged')}
+          />
+        </View>
+        <Text style={{ color: theme.textMuted, fontSize: 12.5, marginTop: 4, lineHeight: 18 }}>
+          {prefs.readingMode === 'paged' ? t('settingsReader.modePagedSubtitle') : t('settingsReader.modeScrollSubtitle')}
+        </Text>
+        {prefs.readingMode === 'paged' ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 14 }}>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={{ color: theme.text, fontWeight: '700' }}>{t('settingsReader.pageTurn')}</Text>
+              <Text style={{ color: theme.textMuted, fontSize: 12.5, marginTop: 4, lineHeight: 18 }}>{t('settingsReader.pageTurnSubtitle')}</Text>
+            </View>
+            <Switch
+              value={prefs.pageTurnAnimation === true}
+              onValueChange={(v) => setPref('pageTurnAnimation', v)}
+              trackColor={{ false: theme.outline, true: theme.primary }}
+              thumbColor={theme.surface}
+            />
+          </View>
+        ) : null}
       </Surface>
 
       <SectionLabel>{t('settingsReader.typography')}</SectionLabel>

@@ -71,6 +71,33 @@ export function initDatabase() {
         updatedAt INTEGER
       );
       CREATE INDEX IF NOT EXISTS idx_downloads_status ON downloads(status);
+      -- Local EPUB/PDF documents. Each has a row in novels (kind = 'epub' | 'pdf') so it shows up in the
+      -- library, plus a row here with the file location, reading position and (EPUB) spine/toc.
+      CREATE TABLE IF NOT EXISTS documents (
+        novelId TEXT PRIMARY KEY NOT NULL,
+        format TEXT NOT NULL,
+        filePath TEXT NOT NULL,
+        fileName TEXT,
+        fileSize INTEGER,
+        pageCount INTEGER,
+        toc TEXT,
+        spine TEXT,
+        rtl INTEGER DEFAULT 0,
+        position TEXT,
+        progress REAL DEFAULT 0,
+        lastReadAt INTEGER,
+        importedAt INTEGER
+      );
+      CREATE TABLE IF NOT EXISTS bookmarks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        novelId TEXT NOT NULL,
+        chapter INTEGER,
+        page INTEGER,
+        ratio REAL,
+        label TEXT,
+        createdAt INTEGER
+      );
+      CREATE INDEX IF NOT EXISTS idx_bookmarks_novel ON bookmarks(novelId);
     `);
     await migrate(db);
     return db;
@@ -87,6 +114,11 @@ async function migrate(db) {
   await db.execAsync(
     'CREATE INDEX IF NOT EXISTS idx_chapters_last_read ON chapters(lastReadAt DESC);',
   );
+  // 'novel' (online, plugin-backed — every pre-existing row) | 'epub' | 'pdf' (local documents).
+  const novelCols = await db.getAllAsync('PRAGMA table_info(novels)');
+  if (!novelCols.some((c) => c.name === 'kind')) {
+    await db.execAsync("ALTER TABLE novels ADD COLUMN kind TEXT DEFAULT 'novel'");
+  }
 }
 
 
@@ -130,6 +162,8 @@ export function deleteNovel(novelId) {
     await db.runAsync('DELETE FROM chapters WHERE novelId = ?', [novelId]);
     await db.runAsync('DELETE FROM novels WHERE id = ?', [novelId]);
     await db.runAsync('DELETE FROM downloads WHERE novelId = ?', [novelId]);
+    await db.runAsync('DELETE FROM documents WHERE novelId = ?', [novelId]);
+    await db.runAsync('DELETE FROM bookmarks WHERE novelId = ?', [novelId]);
   });
 }
 
@@ -155,8 +189,10 @@ export function getLibrary() {
     const rows = await db.getAllAsync(
       `SELECT n.*,
          (SELECT COUNT(*) FROM chapters c WHERE c.novelId = n.id) AS totalChapters,
-         (SELECT COUNT(*) FROM chapters c WHERE c.novelId = n.id AND c.read = 1) AS readChapters
-       FROM novels n WHERE n.inLibrary = 1 ORDER BY n.title COLLATE NOCASE`,
+         (SELECT COUNT(*) FROM chapters c WHERE c.novelId = n.id AND c.read = 1) AS readChapters,
+         d.progress AS docProgress
+       FROM novels n LEFT JOIN documents d ON d.novelId = n.id
+       WHERE n.inLibrary = 1 ORDER BY n.title COLLATE NOCASE`,
     );
     return rows.map((r) => {
       const n = mapNovel(r);
@@ -509,7 +545,8 @@ export function getBackupSnapshot() {
     const novels = await db.getAllAsync(
       `SELECT DISTINCT n.* FROM novels n
          LEFT JOIN chapters c ON c.novelId = n.id
-        WHERE n.inLibrary = 1 OR c.read = 1 OR c.lastReadAt IS NOT NULL`,
+        WHERE COALESCE(n.kind, 'novel') = 'novel'
+          AND (n.inLibrary = 1 OR c.read = 1 OR c.lastReadAt IS NOT NULL)`,
     );
     const out = [];
     for (const row of novels) {
@@ -588,5 +625,137 @@ export function restoreLibrarySnapshot(novels) {
         }
       }
     });
+  });
+}
+
+
+const parseJson = (raw, fallback) => {
+  if (raw == null) return fallback;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+};
+
+function mapDocument(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    rtl: !!row.rtl,
+    toc: parseJson(row.toc, []),
+    spine: parseJson(row.spine, []),
+    position: parseJson(row.position, null),
+  };
+}
+
+/** Creates the library entry and the document row together; the file must already be in place. */
+export function insertDocument({ novel, doc }) {
+  return serialize(async () => {
+    const db = await getDb();
+    await db.withTransactionAsync(async () => {
+      await db.runAsync(
+        `INSERT INTO novels (id, pluginId, path, title, author, cover, status, summary, genres, inLibrary, addedAt, kind)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+         ON CONFLICT(id) DO UPDATE SET inLibrary = 1`,
+        [
+          novel.id,
+          null,
+          null,
+          novel.title ?? 'Untitled',
+          novel.author ?? null,
+          novel.cover ?? null,
+          null,
+          novel.summary ?? null,
+          '[]',
+          1,
+          Date.now(),
+          doc.format,
+        ],
+      );
+      await db.runAsync(
+        `INSERT OR REPLACE INTO documents
+           (novelId, format, filePath, fileName, fileSize, pageCount, toc, spine, rtl, position, progress, lastReadAt, importedAt)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [
+          novel.id,
+          doc.format,
+          doc.filePath,
+          doc.fileName ?? null,
+          doc.fileSize ?? null,
+          doc.pageCount ?? null,
+          doc.toc ? JSON.stringify(doc.toc) : null,
+          doc.spine ? JSON.stringify(doc.spine) : null,
+          doc.rtl ? 1 : 0,
+          null,
+          0,
+          null,
+          Date.now(),
+        ],
+      );
+    });
+  });
+}
+
+export function getDocument(novelId) {
+  return serialize(async () => {
+    const db = await getDb();
+    return mapDocument(await db.getFirstAsync('SELECT * FROM documents WHERE novelId = ?', [novelId]));
+  });
+}
+
+/** Stores where the reader is (`position` is format-specific JSON) and the 0..1 overall progress. */
+export function saveDocumentPosition(novelId, position, progress) {
+  const clamped = Math.max(0, Math.min(1, Number(progress) || 0));
+  return serialize(async () => {
+    const db = await getDb();
+    await db.runAsync('UPDATE documents SET position = ?, progress = ?, lastReadAt = ? WHERE novelId = ?', [
+      JSON.stringify(position ?? null),
+      clamped,
+      Date.now(),
+      novelId,
+    ]);
+  });
+}
+
+/** Stores a (re)generated cover for a local document; only local documents are touched. */
+export function setDocumentCover(novelId, cover) {
+  return serialize(async () => {
+    const db = await getDb();
+    await db.runAsync("UPDATE novels SET cover = ? WHERE id = ? AND COALESCE(kind, 'novel') != 'novel'", [cover ?? null, novelId]);
+  });
+}
+
+export function updateDocumentMeta(novelId, { pageCount }) {
+  return serialize(async () => {
+    const db = await getDb();
+    await db.runAsync('UPDATE documents SET pageCount = ? WHERE novelId = ?', [pageCount ?? null, novelId]);
+  });
+}
+
+export function getBookmarks(novelId) {
+  return serialize(async () => {
+    const db = await getDb();
+    return db.getAllAsync('SELECT * FROM bookmarks WHERE novelId = ? ORDER BY COALESCE(chapter, 0), COALESCE(page, 0), ratio', [
+      novelId,
+    ]);
+  });
+}
+
+export function addBookmark(novelId, { chapter = null, page = null, ratio = null, label = null }) {
+  return serialize(async () => {
+    const db = await getDb();
+    const res = await db.runAsync(
+      'INSERT INTO bookmarks (novelId, chapter, page, ratio, label, createdAt) VALUES (?,?,?,?,?,?)',
+      [novelId, chapter, page, ratio, label, Date.now()],
+    );
+    return res.lastInsertRowId;
+  });
+}
+
+export function removeBookmark(id) {
+  return serialize(async () => {
+    const db = await getDb();
+    await db.runAsync('DELETE FROM bookmarks WHERE id = ?', [id]);
   });
 }
