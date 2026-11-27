@@ -1,19 +1,35 @@
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, useColorScheme, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
-import { useAppTheme } from '../../hooks/useAppTheme';
+import { useAppearance, useAppTheme } from '../../hooks/useAppTheme';
 import { useI18n } from '../../hooks/useI18n';
 import { alpha, RADIUS, THEMES, themeDescription, themeName } from '../../theme/theme';
-import { APPEARANCES, APPEARANCE_KEYS, resolveActivePalette } from '../../theme/palette';
+import { APPEARANCES, APPEARANCE_KEYS, resolveActivePalette, SYSTEM_APPEARANCE } from '../../theme/palette';
 import Ripple from '../../components/Ripple';
 import { SectionLabel } from '../../components/MD3';
 
+// Card geometry is fixed by structure, not by content: the title row reserves the indicator's height
+// whether or not it is shown, the description is clamped to a two-line slot, and the border is always
+// 2px. Cards in a row stretch to each other, so all four are identical.
+const DESCRIPTION_LINE = 15;
+
 function AppearanceCard({ mode, identityKey, selected, onPress, t }) {
-  const preview = resolveActivePalette(mode.key, identityKey);
+  const scheme = useColorScheme();
+  const preview = resolveActivePalette(mode.key, identityKey, scheme);
+  // System follows the device, so its swatches show both sides it can resolve to.
+  const swatches =
+    mode.key === SYSTEM_APPEARANCE
+      ? (() => {
+          const light = resolveActivePalette('light', identityKey);
+          const dark = resolveActivePalette('dark', identityKey);
+          return [light.surface2, light.primary, dark.surface2, dark.primary];
+        })()
+      : [preview.surface1, preview.surface2, preview.surface3, preview.primary];
   return (
-    <Ripple onPress={onPress}>
+    <Ripple onPress={onPress} style={{ flex: 1 }}>
       <View
         style={{
+          flex: 1,
           borderRadius: RADIUS.lg,
           overflow: 'hidden',
           backgroundColor: preview.background,
@@ -22,8 +38,10 @@ function AppearanceCard({ mode, identityKey, selected, onPress, t }) {
         }}
       >
         <View style={{ padding: 12, gap: 6 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ color: preview.text, fontWeight: '800', fontSize: 14 }}>{t(mode.nameKey)}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 22 }}>
+            <Text numberOfLines={1} style={{ flex: 1, color: preview.text, fontWeight: '800', fontSize: 14 }}>
+              {t(mode.nameKey)}
+            </Text>
             {selected ? (
               <View
                 style={{
@@ -39,9 +57,14 @@ function AppearanceCard({ mode, identityKey, selected, onPress, t }) {
               </View>
             ) : null}
           </View>
-          <Text style={{ color: preview.textMuted, fontSize: 11, lineHeight: 15 }}>{t(mode.descriptionKey)}</Text>
+          <Text
+            numberOfLines={2}
+            style={{ color: preview.textMuted, fontSize: 11, lineHeight: DESCRIPTION_LINE, minHeight: DESCRIPTION_LINE * 2 }}
+          >
+            {t(mode.descriptionKey)}
+          </Text>
           <View style={{ flexDirection: 'row', gap: 4, marginTop: 2 }}>
-            {[preview.surface1, preview.surface2, preview.surface3, preview.primary].map((color, index) => (
+            {swatches.map((color, index) => (
               <View
                 key={index}
                 style={{
@@ -150,6 +173,7 @@ export default function ThemeScreen() {
   const theme = useAppTheme();
   const { t: translate } = useI18n();
   const appearance = useStore((s) => s.prefs.appearance);
+  const activeAppearance = useAppearance();
   const identityKey = useStore((s) => s.prefs.theme);
   const setPref = useStore((s) => s.setPref);
 
@@ -159,16 +183,19 @@ export default function ThemeScreen() {
       <Text style={{ color: theme.textMuted, fontSize: 13, lineHeight: 19, marginBottom: 14 }}>
         {translate('settingsTheme.appearanceSubtitle')}
       </Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24 }}>
-        {APPEARANCE_KEYS.map((key) => (
-          <View key={key} style={{ flex: 1, minWidth: 100 }}>
-            <AppearanceCard
-              mode={APPEARANCES[key]}
-              identityKey={identityKey}
-              selected={key === appearance}
-              onPress={() => setPref('appearance', key)}
-              t={translate}
-            />
+      <View style={{ gap: 12, marginBottom: 24 }}>
+        {[APPEARANCE_KEYS.slice(0, 2), APPEARANCE_KEYS.slice(2)].map((row) => (
+          <View key={row[0]} style={{ flexDirection: 'row', gap: 12 }}>
+            {row.map((key) => (
+              <AppearanceCard
+                key={key}
+                mode={APPEARANCES[key]}
+                identityKey={identityKey}
+                selected={key === appearance}
+                onPress={() => setPref('appearance', key)}
+                t={translate}
+              />
+            ))}
           </View>
         ))}
       </View>
@@ -182,7 +209,7 @@ export default function ThemeScreen() {
           <IdentityCard
             key={identity.key}
             identity={identity}
-            appearance={appearance}
+            appearance={activeAppearance}
             selected={identity.key === identityKey}
             onPress={() => setPref('theme', identity.key)}
             t={translate}

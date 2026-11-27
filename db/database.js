@@ -60,7 +60,8 @@ export function initDatabase() {
         code TEXT NOT NULL,
         installedAt INTEGER
       );
-      CREATE INDEX IF NOT EXISTS idx_chapters_novel ON chapters(novelId);
+      CREATE INDEX IF NOT EXISTS idx_chapters_novel_read ON chapters(novelId, read);
+      DROP INDEX IF EXISTS idx_chapters_novel;
       CREATE TABLE IF NOT EXISTS downloads (
         chapterId TEXT PRIMARY KEY NOT NULL,
         novelId TEXT NOT NULL,

@@ -3,7 +3,14 @@ import { READER_BACKGROUNDS, THEMES } from './theme.js';
 export const DEFAULT_THEME_KEY = 'honya';
 export const DEFAULT_APPEARANCE_KEY = 'amoled';
 
+export const SYSTEM_APPEARANCE = 'system';
+
 export const APPEARANCES = {
+  system: {
+    key: 'system',
+    nameKey: 'appearance.system.name',
+    descriptionKey: 'appearance.system.description',
+  },
   light: {
     key: 'light',
     nameKey: 'appearance.light.name',
@@ -22,6 +29,16 @@ export const APPEARANCES = {
 };
 
 export const APPEARANCE_KEYS = Object.keys(APPEARANCES);
+
+// What a palette can actually be drawn in. 'system' is only a preference that resolves to one of
+// light/dark from the device; AMOLED is never inferred from the device.
+const RESOLVED_APPEARANCES = ['light', 'dark', 'amoled'];
+
+/** Concrete appearance for a stored preference. `scheme` is the device's 'light' | 'dark' (or null). */
+export function resolveAppearance(pref, scheme) {
+  if (pref === SYSTEM_APPEARANCE) return scheme === 'light' ? 'light' : 'dark';
+  return RESOLVED_APPEARANCES.includes(pref) ? pref : DEFAULT_APPEARANCE_KEY;
+}
 
 // The legacy themes bundled an appearance with an identity. Keep the original
 // look selectable when the matching mode is chosen, and use it to migrate old prefs.
@@ -118,12 +135,6 @@ const ERROR_BY_APPEARANCE = {
   light: '#ba1a1a',
   dark: '#ffb4ab',
   amoled: '#ff6b6b',
-};
-
-const READER_BACKGROUND_APP = {
-  key: 'app',
-  name: 'Use app appearance',
-  nameKey: 'reader.backgroundApp',
 };
 
 const paletteCache = new Map();
@@ -244,8 +255,8 @@ function deriveAccents(themeKey, appearance) {
 }
 
 /** Cached, immutable active palette. The token shape matches the legacy THEMES entries. */
-export function resolveActivePalette(appearanceKey, themeKey) {
-  const appearance = isAppearanceKey(appearanceKey) ? appearanceKey : DEFAULT_APPEARANCE_KEY;
+export function resolveActivePalette(appearanceKey, themeKey, scheme) {
+  const appearance = resolveAppearance(appearanceKey, scheme);
   const theme = isThemeKey(themeKey) ? themeKey : DEFAULT_THEME_KEY;
   const cacheKey = `${appearance}:${theme}`;
   const cached = paletteCache.get(cacheKey);
@@ -267,31 +278,40 @@ export function resolveActivePalette(appearanceKey, themeKey) {
 }
 
 /** Pure selector used by useAppTheme; tests use it to verify independent switching. */
-export function selectActivePalette(prefs) {
+export function selectActivePalette(prefs, scheme) {
   if (!isObject(prefs)) return resolveActivePalette(DEFAULT_APPEARANCE_KEY, DEFAULT_THEME_KEY);
-  return resolveActivePalette(prefs.appearance, prefs.theme);
+  return resolveActivePalette(prefs.appearance, prefs.theme, scheme);
 }
 
 /**
- * Fill in and validate only the two appearance-related pref fields.
- * Unknown prefs are preserved so older backups and future keys stay intact.
+ * Fill in and validate the appearance-related pref fields (theme, appearance, and the retired
+ * 'app' reader background). Unknown prefs are preserved so older backups and future keys stay intact.
  */
 export function normalizeThemePrefs(prefs) {
   const source = isObject(prefs) ? prefs : {};
   const theme = isThemeKey(source.theme) ? source.theme : DEFAULT_THEME_KEY;
   const appearance = isAppearanceKey(source.appearance) ? source.appearance : inferAppearance(theme);
-  return { ...source, theme, appearance };
+  const out = { ...source, theme, appearance };
+  if (source.readerBackground === RETIRED_APP_READER_BACKGROUND) {
+    out.readerBackground = migrateReaderBackground(source.readerBackground, appearance);
+  }
+  return out;
 }
 
-export const READER_BACKGROUNDS_APP = READER_BACKGROUND_APP;
+// The reader's background is its own preference. Earlier builds offered 'app' (follow the app
+// appearance); it now maps once to the preset that matches the user's chosen appearance.
+const RETIRED_APP_READER_BACKGROUND = 'app';
+const APP_BACKGROUND_PRESET = { light: 'white', dark: 'dark', amoled: 'black', system: 'dark' };
 
-export const READER_BACKGROUND_OPTIONS = [READER_BACKGROUND_APP, ...READER_BACKGROUNDS];
+export function migrateReaderBackground(pref, appearance) {
+  if (pref !== RETIRED_APP_READER_BACKGROUND) return pref;
+  return APP_BACKGROUND_PRESET[appearance] ?? 'dark';
+}
 
-export function resolveReaderBackground(pref, activePalette) {
-  const palette = isObject(activePalette) ? activePalette : selectActivePalette(null);
-  if (pref === READER_BACKGROUND_APP.key) {
-    return { ...READER_BACKGROUND_APP, bg: palette.background, fg: palette.text };
-  }
+export const READER_BACKGROUND_OPTIONS = READER_BACKGROUNDS;
+
+/** The reader's colours for a stored preference; independent of the app appearance and theme. */
+export function resolveReaderBackground(pref) {
   return (
     READER_BACKGROUNDS.find((preset) => preset.key === pref) ??
     READER_BACKGROUNDS.find((preset) => preset.key === 'dark') ??

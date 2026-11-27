@@ -10,14 +10,15 @@ import { upsertNovel } from '../../db/database';
 import { encodeNavParam } from '../../lib/navIds';
 import { Button, EmptyState, ScreenHeader, SearchBar, SectionLabel, SkeletonList } from '../../components/MD3';
 import Ripple from '../../components/Ripple';
+import Cover from '../../components/Cover';
 import { RADIUS } from '../../theme/theme';
 
 const DEBOUNCE_MS = 450;
 
-const SourceRow = memo(function SourceRow({ ext, onPress }) {
+const SourceRow = memo(function SourceRow({ ext, onOpen }) {
   const theme = useAppTheme();
   return (
-    <Ripple onPress={onPress}>
+    <Ripple onPress={() => onOpen(ext)}>
       <View
         style={{
           flexDirection: 'row',
@@ -59,16 +60,12 @@ const SourceRow = memo(function SourceRow({ ext, onPress }) {
   );
 });
 
-const SearchResultRow = memo(function SearchResultRow({ item, onPress }) {
+const SearchResultRow = memo(function SearchResultRow({ item, onOpen }) {
   const theme = useAppTheme();
   return (
-    <Ripple onPress={onPress}>
+    <Ripple onPress={() => onOpen(item)}>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 16 }}>
-        <View style={{ width: 42, height: 60, borderRadius: RADIUS.sm, overflow: 'hidden', backgroundColor: theme.surface2 }}>
-          {item.cover ? (
-            <Image source={{ uri: item.cover }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-          ) : null}
-        </View>
+        <Cover uri={item.cover} width={42} height={60} radius={RADIUS.sm} />
         <View style={{ flex: 1, marginLeft: 12 }}>
           <Text numberOfLines={2} style={{ color: theme.text, fontWeight: '700', fontSize: 14, lineHeight: 18 }}>
             {item.title}
@@ -172,6 +169,10 @@ export default function CatalogsScreen() {
     [router],
   );
 
+  const openSource = useCallback((ext) => router.push(`/browse/${encodeNavParam(ext.id)}`), [router]);
+  const renderResult = useCallback(({ item }) => <SearchResultRow item={item} onOpen={openResult} />, [openResult]);
+  const renderSource = useCallback(({ item }) => <SourceRow ext={item} onOpen={openSource} />, [openSource]);
+
   const activeQuery = query.trim();
 
   let body;
@@ -200,7 +201,7 @@ export default function CatalogsScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 32, flexGrow: 1 }}
         keyboardShouldPersistTaps="handled"
-        renderItem={({ item }) => <SearchResultRow item={item} onPress={() => openResult(item)} />}
+        renderItem={renderResult}
         ListHeaderComponent={
           errorCount > 0 ? (
             <Text style={{ color: theme.textMuted, fontSize: 12, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 }}>
@@ -233,9 +234,7 @@ export default function CatalogsScreen() {
             </Text>
           </View>
         }
-        renderItem={({ item }) => (
-          <SourceRow ext={item} onPress={() => router.push(`/browse/${encodeNavParam(item.id)}`)} />
-        )}
+        renderItem={renderSource}
       />
     );
   }

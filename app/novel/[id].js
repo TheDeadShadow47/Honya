@@ -20,9 +20,7 @@ import { showToast } from '../../lib/toast';
 const DEFAULT_FILTERS = { downloaded: false, unread: false };
 const DEFAULT_DISPLAY = { sourceTitle: false, chapterNumber: false };
 
-// Same classification the reader screen uses for a failed network request — a connectivity
-// problem, not a real content/parsing error. Kept local (rather than shared) so this fix
-// doesn't touch the already-working reader screen.
+// Same offline classification the reader uses: a connectivity problem, not a parsing error.
 const OFFLINE_RE = /Network request failed|Failed to fetch|fetch failed|Network is unreachable|Unable to resolve host|ENETUNREACH|ECONNRESET|ECONNREFUSED|timeout|timed out/i;
 
 export default function NovelDetailsScreen() {
@@ -54,7 +52,6 @@ export default function NovelDetailsScreen() {
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
-  // Only written to storage when the settings actually change.
   const savedPrefsRef = useRef(
     JSON.stringify({
       filters: initialPrefs?.filters ?? DEFAULT_FILTERS,
@@ -242,8 +239,6 @@ export default function NovelDetailsScreen() {
     return { canDownload, canRemoveDownload, canMarkRead, canMarkUnread };
   }, [chaptersById, selectedIds]);
 
-  /* ---------- selection ---------- */
-
   const exitSelect = useCallback(() => {
     setSelecting(false);
     setSelectedIds(new Set());
@@ -284,9 +279,6 @@ export default function NovelDetailsScreen() {
     [],
   );
 
-  /* ---------- one-tap range actions ---------- */
-
-  // Selects everything except the currently selected chapters ("all but these").
   const selectAllExcept = useCallback(() => {
     const excluded = selectedRef.current;
     const next = new Set(visibleRef.current.filter((c) => !excluded.has(c.id)).map((c) => c.id));
@@ -306,8 +298,7 @@ export default function NovelDetailsScreen() {
     setSelectedIds(next);
   }, []);
 
-  /* ---------- stable row callbacks (keep ChapterRow memoised) ---------- */
-
+  // Keep row callbacks stable so ChapterRow stays memoised.
   const selectingRef = useRef(selecting);
   selectingRef.current = selecting;
 
@@ -327,7 +318,6 @@ export default function NovelDetailsScreen() {
     [router, toggleSelect],
   );
 
-  // Long-press starts selection with that chapter; tapping again just toggles it.
   const longPressChapter = useCallback(
     (chapter) => {
       if (!selectingRef.current) {
@@ -368,8 +358,6 @@ export default function NovelDetailsScreen() {
     },
     [removeDownload, reload, t],
   );
-
-  /* ---------- bulk actions ---------- */
 
   const bulkDownload = useCallback(async () => {
     const list = selectedChapters().filter((c) => !c.downloaded);
@@ -418,8 +406,6 @@ export default function NovelDetailsScreen() {
 
   const markRead = useCallback(() => bulkMarkRead(true), [bulkMarkRead]);
   const markUnread = useCallback(() => bulkMarkRead(false), [bulkMarkRead]);
-
-  /* ---------- header callbacks ---------- */
 
   const onBack = useCallback(() => router.back(), [router]);
   const onToggleExpanded = useCallback(() => setExpanded((v) => !v), []);

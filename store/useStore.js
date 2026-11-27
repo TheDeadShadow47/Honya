@@ -1,3 +1,4 @@
+import { AppState } from 'react-native';
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { deleteDocumentFiles } from '../lib/documents';
@@ -11,6 +12,7 @@ import {
   DEFAULT_THEME_KEY,
   isAppearanceKey,
   isThemeKey,
+  migrateReaderBackground,
   normalizeThemePrefs,
 } from '../theme/palette';
 import * as backup from '../lib/backup';
@@ -19,6 +21,7 @@ import * as libraryUpdate from '../lib/libraryUpdate';
 // Side-effect import: registers the OS background download worker via module-level defineTask().
 import '../lib/backgroundDownload';
 import * as updateManager from '../lib/updateManager';
+import { createCoalescedWriter, reuseRows } from '../lib/coalesce';
 
 const PREFS_KEY = '@honya/prefs';
 const REPOS_KEY = '@honya/repos';
@@ -46,6 +49,16 @@ async function migrateLegacyStorageKeys() {
   if (toSet.length) await AsyncStorage.multiSet(toSet);
   if (toRemove.length) await AsyncStorage.multiRemove(toRemove);
 }
+
+// Sliders call setPref on every tick. State updates immediately; the AsyncStorage write is coalesced and
+// flushed when the app leaves the foreground, so the last value survives an OS kill.
+const prefsWriter = createCoalescedWriter((prefs) => AsyncStorage.setItem(PREFS_KEY, JSON.stringify(prefs)), 400);
+let appStateHooked = false;
+
+const refreshed = (key, next) => (s) => {
+  const rows = reuseRows(s[key], next);
+  return rows === s[key] ? s : { [key]: rows };
+};
 
 export const DEFAULT_PREFS = {
   theme: DEFAULT_THEME_KEY,
@@ -103,7 +116,11 @@ export const useStore = create((set, get) => ({
       const saved = JSON.parse(prefsRaw[1] || '{}');
       const merged = { ...DEFAULT_PREFS, ...(saved && typeof saved === 'object' ? saved : {}) };
       prefs = normalizeThemePrefs(merged);
-      if (prefs.theme !== merged.theme || prefs.appearance !== merged.appearance) {
+      if (
+        prefs.theme !== merged.theme ||
+        prefs.appearance !== merged.appearance ||
+        prefs.readerBackground !== merged.readerBackground
+      ) {
         AsyncStorage.setItem(PREFS_KEY, JSON.stringify(prefs)).catch(() => {});
       }
     } catch {}
@@ -120,16 +137,18 @@ export const useStore = create((set, get) => ({
     setLanguage(prefs.lang);
     applyDirection();
     set({ prefs, userRepositories: repos, installedExtensions, ready: true });
+    if (!appStateHooked) {
+      appStateHooked = true;
+      AppState.addEventListener('change', (state) => {
+        if (state !== 'active') prefsWriter.flush();
+      });
+    }
     await get().refreshLibrary();
     await get().refreshUpdates();
     await get().refreshHistory();
 
-    // Starter Guide first-launch decision. There's no existing "fresh install" signal in
-    // Honya, and the persisted flag itself is brand new in this release, so its mere
-    // absence can't tell a genuinely new install apart from an existing v1.4.1+ user
-    // upgrading into this version (both would have it absent on their very first v1.4.2
-    // hydrate). Decide once, using real local usage as the signal, and persist the
-    // decision immediately so this heuristic never runs again on this device.
+    // No fresh-install flag exists yet, so use real local usage to decide once and
+    // persist the result immediately.
     try {
       const guideRaw = await AsyncStorage.getItem(STARTER_GUIDE_KEY);
       if (guideRaw != null) {
@@ -179,9 +198,10 @@ export const useStore = create((set, get) => ({
     if (key === 'appearance' && !isAppearanceKey(value)) return;
     const prefs = { ...get().prefs, [key]: value };
     set({ prefs });
-    await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    prefsWriter.save(prefs);
   },
   resetPrefs: async () => {
+    prefsWriter.cancel();
     set({ prefs: DEFAULT_PREFS });
     await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(DEFAULT_PREFS));
   },
@@ -315,10 +335,10 @@ export const useStore = create((set, get) => ({
   runLibraryUpdate: (opts) => libraryUpdate.runLibraryUpdate(opts),
   cancelLibraryUpdate: () => libraryUpdate.cancelLibraryUpdate(),
 
-  refreshLibrary: async () => set({ library: await db.getLibrary() }),
-  refreshUpdates: async () => set({ updates: await db.getRecentUpdates() }),
+  refreshLibrary: async () => set(refreshed('library', await db.getLibrary())),
+  refreshUpdates: async () => set(refreshed('updates', await db.getRecentUpdates())),
 
-  refreshHistory: async () => set({ history: await db.getHistory() }),
+  refreshHistory: async () => set(refreshed('history', await db.getHistory())),
   removeHistoryEntry: async (chapterId) => {
     await db.removeHistoryEntry(chapterId);
     await get().refreshHistory();
@@ -393,6 +413,8 @@ export const useStore = create((set, get) => ({
       theme: restoredAppearance.theme,
       appearance: restoredAppearance.appearance,
     };
+    mergedPrefs.readerBackground = migrateReaderBackground(mergedPrefs.readerBackground, mergedPrefs.appearance);
+    prefsWriter.cancel();
     await AsyncStorage.setItem(REPOS_KEY, JSON.stringify(mergedRepos));
     await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(mergedPrefs));
 
@@ -416,5 +438,3 @@ export const useStore = create((set, get) => ({
   checkWhatsNew: () => updateManager.checkWhatsNew(),
   markWhatsNewSeen: () => updateManager.markWhatsNewSeen(),
 }));
-
-export const useTheme = () => useStore((s) => s.prefs.theme);

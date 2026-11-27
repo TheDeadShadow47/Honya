@@ -6,7 +6,6 @@ import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
 import { useI18n } from '../../hooks/useI18n';
-import { useAppTheme } from '../../hooks/useAppTheme';
 import * as db from '../../db/database';
 import { loadPlugin, pluginApi } from '../../lib/pluginEngine';
 import { sanitizeChapter } from '../../lib/clean';
@@ -108,7 +107,6 @@ export default function ReaderScreen() {
   const ctx = bootCtxRef.current;
 
   const prefs = useStore((s) => s.prefs);
-  const appTheme = useAppTheme();
   const setPref = useStore((s) => s.setPref);
   const refreshLibrary = useStore((s) => s.refreshLibrary);
   const refreshHistory = useStore((s) => s.refreshHistory);
@@ -116,7 +114,7 @@ export default function ReaderScreen() {
   const downloadChapter = useStore((s) => s.downloadChapter);
   const removeDownload = useStore((s) => s.removeDownload);
 
-  const palette = resolveReaderBackground(prefs.readerBackground, appTheme);
+  const palette = resolveReaderBackground(prefs.readerBackground);
   // Infinite scroll stays the default; anything other than an explicit 'paged' preference is scroll.
   const paged = prefs.readingMode === 'paged';
 
@@ -278,7 +276,7 @@ export default function ReaderScreen() {
         // "Mark read on open" applies to chapters the reader auto-opens too.
         if (prefsRef.current.markReadOnOpen && !markedIdsRef.current.has(next.id)) {
           markedIdsRef.current.add(next.id);
-          db.markChapterRead(next.id, true).then(() => refreshLibrary());
+          db.markChapterRead(next.id, true).then(() => refreshLibrary()).catch(() => {});
         }
       }
     } finally {
@@ -483,7 +481,7 @@ export default function ReaderScreen() {
             db.saveChapterProgress(prevSeg.id, 1).catch(() => {});
             if (!prefsRef.current.markReadOnOpen && !markedIdsRef.current.has(prevSeg.id)) {
               markedIdsRef.current.add(prevSeg.id);
-              db.markChapterRead(prevSeg.id, true).then(refreshLibrary);
+              db.markChapterRead(prevSeg.id, true).then(refreshLibrary).catch(() => {});
             } else {
               markedIdsRef.current.add(prevSeg.id);
             }
@@ -497,7 +495,6 @@ export default function ReaderScreen() {
         setActiveIndex(idx);
         if (idx === segs.length - 1) appendNextSegment();
       } else {
-        // Within one chapter: track a local ratio.
         const seg = segs[idx];
         if (seg) {
           const top = segOffset(heightsRef.current, contentPadTop, idx);
@@ -514,11 +511,10 @@ export default function ReaderScreen() {
         }
       }
 
-      // Mark the last chapter read when the reader hits the very end.
       const reachedEnd = y + layoutMeasurement.height >= contentSize.height - 80;
       if (reachedEnd && idx === segs.length - 1 && lastId && !prefsRef.current.markReadOnOpen && !markedIdsRef.current.has(lastId)) {
         markedIdsRef.current.add(lastId);
-        db.markChapterRead(lastId, true).then(refreshLibrary);
+        db.markChapterRead(lastId, true).then(refreshLibrary).catch(() => {});
       }
 
       // Prefetch the next chapter as the bottom approaches (also covers fast scrolls).
@@ -530,7 +526,6 @@ export default function ReaderScreen() {
     [loading, appendNextSegment, refreshLibrary, contentPadTop],
   );
 
-  // Flush every chapter's last known position when leaving the screen.
   useEffect(() => {
     return () => {
       progressMapRef.current.forEach((ratio, cid) => {
@@ -587,7 +582,7 @@ export default function ReaderScreen() {
       }
       if (isLast && !prefsRef.current.markReadOnOpen && !markedIdsRef.current.has(seg.id)) {
         markedIdsRef.current.add(seg.id);
-        db.markChapterRead(seg.id, true).then(refreshLibrary);
+        db.markChapterRead(seg.id, true).then(refreshLibrary).catch(() => {});
       }
     },
     [refreshLibrary],
@@ -727,8 +722,7 @@ export default function ReaderScreen() {
   const [ttsState, setTtsState] = useState(() => tts.getState());
   useEffect(() => tts.subscribe(setTtsState), []);
 
-  // A hard chapter switch (prev/next, or leaving the reader) always stops any active
-  // session — TTS is scoped to one chapter at a time, per the MVP scope.
+  // A hard chapter switch stops TTS: sessions are scoped to one chapter.
   useEffect(() => {
     return () => tts.stop();
   }, [id]);
@@ -1056,7 +1050,6 @@ export default function ReaderScreen() {
         <Text style={{ color: palette.fg, fontWeight: '800', fontSize: 13, marginTop: 18 }}>{t('reader.background')}</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 10 }}>
           {READER_BACKGROUND_OPTIONS.map((b) => {
-            const option = resolveReaderBackground(b.key, appTheme);
             return (
               <Ripple key={b.key} onPress={() => setPref('readerBackground', b.key)}>
                 <View
@@ -1064,14 +1057,14 @@ export default function ReaderScreen() {
                     width: 46,
                     height: 46,
                     borderRadius: RADIUS.md,
-                    backgroundColor: option.bg,
+                    backgroundColor: b.bg,
                     borderWidth: prefs.readerBackground === b.key ? 2 : 1,
                     borderColor: prefs.readerBackground === b.key ? palette.fg : palette.fg + '33',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Text style={{ color: option.fg, fontWeight: '800' }}>A</Text>
+                  <Text style={{ color: b.fg, fontWeight: '800' }}>A</Text>
                 </View>
               </Ripple>
             );

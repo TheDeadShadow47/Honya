@@ -1,7 +1,3 @@
-// Lightweight regression check for the TTS chunking logic (lib/ttsChunk.js). No test
-// framework — just assert() and a non-zero exit code on failure, matching the project's
-// "no large testing framework for this" scope.
-//
 // Run with: node scripts/test-tts-chunk.js
 
 import assert from 'node:assert/strict';
@@ -30,8 +26,6 @@ check('short chapter stays a single chunk', () => {
 });
 
 check('short paragraphs are packed together up to the length limit', () => {
-  // Many small paragraphs that together exceed one chunk should be packed into as few
-  // chunks as possible, not exploded one-paragraph-per-chunk.
   const para = 'A short sentence of prose. '.repeat(20); // ~560 chars
   const text = Array.from({ length: 10 }, () => para.trim()).join('\n\n'); // ~5.6k chars total
   const chunks = chunkText(text, 2000);
@@ -56,7 +50,6 @@ check('a single run-on "sentence" longer than the limit is hard-split on whitesp
   const chunks = chunkText(words, 300);
   assert.ok(chunks.length > 1);
   for (const c of chunks) assert.ok(c.length <= 300);
-  // Every word should survive somewhere across the chunks, in order, none dropped/duplicated.
   const rejoined = chunks.join(' ');
   assert.equal(rejoined.replace(/\s+/g, ' '), words);
 });

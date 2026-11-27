@@ -104,8 +104,6 @@ function epub2() {
   });
 }
 
-/* ------------------------------ metadata & structure ------------------------------ */
-
 check('EPUB 3: metadata, spine (non-linear skipped) and cover are parsed', () => {
   const book = parseEpub(epub3());
   assert.equal(book.title, 'The Lantern Road');
@@ -156,8 +154,6 @@ check('a book without any table of contents still opens (empty toc)', () => {
   assert.equal(book.cover, null);
   assert.equal(book.author, null);
 });
-
-/* ------------------------------ cover fallbacks ------------------------------ */
 
 const bigImage = (magic) => {
   const d = new Uint8Array(6000);
@@ -233,8 +229,6 @@ check('cover: the extension follows the real image type, not the manifest media-
   assert.equal(book.cover.ext, 'png');
 });
 
-/* ------------------------------ chapter text ------------------------------ */
-
 check('chapter text: paragraphs, entities, inline tags and ignored head/style', () => {
   const bytes = epub3();
   const { text } = readEpubChapter(bytes, parseEpub(bytes).spine[0]);
@@ -269,8 +263,6 @@ check('htmlToText: image-only sections produce empty text without throwing', () 
 check('htmlToText: RTL text and unusual whitespace are preserved sensibly', () => {
   assert.equal(htmlToText('<p>  مرحبا   بالعالم  </p><p>\n\n  ثاني </p>').text, 'مرحبا بالعالم\n\nثاني');
 });
-
-/* ------------------------------ failure handling ------------------------------ */
 
 check('non-zip data is rejected', () => {
   throwsCode(() => parseEpub(strToU8('this is plainly not an epub')), 'not_zip');
@@ -321,8 +313,6 @@ check('resolveZipPath collapses dot segments and strips fragments', () => {
   assert.equal(resolveZipPath('', './a/./b.xhtml'), 'a/b.xhtml');
   assert.equal(resolveZipPath('OEBPS', '/abs/c.xhtml'), 'abs/c.xhtml');
 });
-
-/* ------------------------------ base64 ------------------------------ */
 
 check('base64 round-trips arbitrary bytes and tolerates line breaks', () => {
   for (const len of [0, 1, 2, 3, 4, 5, 100, 1021]) {

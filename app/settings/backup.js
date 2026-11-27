@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useI18n } from '../../hooks/useI18n';
 import { useStore } from '../../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Button, EmptyState, SectionLabel, Surface } from '../../components/MD3';
 import Ripple from '../../components/Ripple';
 import { RADIUS } from '../../theme/theme';
@@ -43,7 +44,7 @@ function IconAction({ icon, color, onPress }) {
 export default function BackupScreen() {
   const theme = useAppTheme();
   const { t } = useI18n();
-  const { createBackup, restoreBackup } = useStore();
+  const { createBackup, restoreBackup } = useStore(useShallow((s) => ({ createBackup: s.createBackup, restoreBackup: s.restoreBackup })));
   const [folderUri, setFolderUri] = useState(null);
   const [backups, setBackups] = useState([]);
   const [creating, setCreating] = useState(false);

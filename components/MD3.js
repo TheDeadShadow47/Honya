@@ -258,7 +258,6 @@ const styles = StyleSheet.create({
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
 });
 
-/** Hairline separator that follows the theme outline colour. */
 export function Divider({ inset = 0, style }) {
   const theme = useAppTheme();
   return (
@@ -310,7 +309,6 @@ export function ProgressBar({ value = 0, height = 4, track, fill, style }) {
   );
 }
 
-/** Small pill used for counts and metadata. */
 export function Badge({ label, tone = 'neutral', style }) {
   const theme = useAppTheme();
   const palette =
@@ -336,7 +334,6 @@ export function Badge({ label, tone = 'neutral', style }) {
   );
 }
 
-/** Sticky-ish day/section heading used by Updates and History. */
 export function ListHeading({ label, right }) {
   const theme = useAppTheme();
   return (
@@ -391,7 +388,6 @@ export function ScreenHeader({ title, subtitle, right, style }) {
   );
 }
 
-/** Consistent, human readable error presentation. */
 export function ErrorState({ title, message, onRetry, retryLabel }) {
   const theme = useAppTheme();
   const { t } = useI18n();

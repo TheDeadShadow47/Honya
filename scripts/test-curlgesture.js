@@ -35,8 +35,6 @@ function harness({ rtl = false, canNext = true, canPrev = true } = {}) {
     commits: [],
     down(x, y) {
       h.s = g.begin(h.s, x, y, cfg);
-      h.x0 = x;
-      h.y0 = y;
       h.active = false;
       return h;
     },

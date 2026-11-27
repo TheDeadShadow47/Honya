@@ -46,9 +46,7 @@ export default function StarterGuide() {
 
   const [step, setStep] = useState(0);
 
-  // Any step-completed/finished path funnels through here so the separate, older
-  // notification-permission prompt never redundantly re-asks right after this guide
-  // already covered the same ground.
+  // Finish also marks the notification prompt seen so it won't re-ask right after the guide.
   const finish = useCallback(async () => {
     await setPref('notificationPromptSeen', true);
     await completeStarterGuide();
@@ -70,7 +68,6 @@ export default function StarterGuide() {
   return (
     <Modal visible animationType="slide" onRequestClose={goBack} statusBarTranslucent>
       <View style={{ flex: 1, backgroundColor: theme.background, paddingTop: insets.top, paddingBottom: insets.bottom }}>
-        {/* Header: progress + skip */}
         <View
           style={{
             flexDirection: rtl ? 'row-reverse' : 'row',
@@ -91,7 +88,6 @@ export default function StarterGuide() {
           )}
         </View>
 
-        {/* Progress dots */}
         <View style={{ flexDirection: rtl ? 'row-reverse' : 'row', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
           {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
             <View
@@ -122,7 +118,6 @@ export default function StarterGuide() {
           />
         </ScrollView>
 
-        {/* Footer nav */}
         <View
           style={{
             flexDirection: rtl ? 'row-reverse' : 'row',

@@ -13,9 +13,11 @@ import {
   isAppearanceKey,
   isPaletteDark,
   isThemeKey,
+  migrateReaderBackground,
   normalizeThemePrefs,
   READER_BACKGROUND_OPTIONS,
   resolveActivePalette,
+  resolveAppearance,
   resolveReaderBackground,
   selectActivePalette,
 } from '../theme/palette.js';
@@ -37,6 +39,7 @@ const TOKEN_KEYS = [
   'secondaryContainer', 'text', 'textMuted', 'error',
 ];
 const HEX = /^#[0-9a-f]{6}$/i;
+const CONCRETE_APPEARANCES = ['light', 'dark', 'amoled'];
 
 check('all 15 original identities are available with unchanged names and descriptions', () => {
   assert.deepEqual(Object.keys(THEMES), IDENTITY_KEYS);
@@ -48,7 +51,7 @@ check('all 15 original identities are available with unchanged names and descrip
 
 check('every identity × appearance combination exposes complete six-digit hex tokens', () => {
   for (const identityKey of IDENTITY_KEYS) {
-    for (const appearance of APPEARANCE_KEYS) {
+    for (const appearance of CONCRETE_APPEARANCES) {
       const palette = resolveActivePalette(appearance, identityKey);
       assert.equal(palette.appearance, appearance);
       assert.equal(palette.identityKey, identityKey);
@@ -89,7 +92,7 @@ check('all combinations meet baseline text and accent contrast', () => {
     return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
   };
   for (const identityKey of IDENTITY_KEYS) {
-    for (const appearance of APPEARANCE_KEYS) {
+    for (const appearance of CONCRETE_APPEARANCES) {
       const palette = resolveActivePalette(appearance, identityKey);
       assert.ok(contrast(palette.text, palette.background) >= 4.5, `${identityKey} + ${appearance} text contrast`);
       assert.ok(contrast(palette.textMuted, palette.background) >= 4, `${identityKey} + ${appearance} muted text contrast`);
@@ -101,7 +104,7 @@ check('all combinations meet baseline text and accent contrast', () => {
 });
 
 check('identity-sensitive surfaces keep distinctive identities from becoming generic', () => {
-  for (const appearance of APPEARANCE_KEYS) {
+  for (const appearance of CONCRETE_APPEARANCES) {
     const surfaces = new Set(IDENTITY_KEYS.map((key) => resolveActivePalette(appearance, key).surface2));
     assert.equal(surfaces.size, IDENTITY_KEYS.length);
   }
@@ -161,18 +164,78 @@ check('preferences survive a storage round-trip without changing either axis', (
   const afterRestart = normalizeThemePrefs(JSON.parse(written));
   assert.deepEqual(afterRestart, saved);
   assert.equal(selectActivePalette(afterRestart), resolveActivePalette('light', 'coffee'));
-  assert.equal(resolveReaderBackground(afterRestart.readerBackground, selectActivePalette(afterRestart)).key, 'black');
+  assert.equal(resolveReaderBackground(afterRestart.readerBackground).key, 'black');
 });
 
-check('reader backgrounds are additive and existing presets are unchanged', () => {
-  assert.deepEqual(READER_BACKGROUND_OPTIONS.map((option) => option.key), ['app', ...READER_BACKGROUNDS.map((b) => b.key)]);
+check('reader backgrounds are their own preference: five fixed presets, no app-following option', () => {
+  assert.deepEqual(READER_BACKGROUND_OPTIONS.map((option) => option.key), ['black', 'dark', 'mocha', 'sepia', 'white']);
+  assert.deepEqual(READER_BACKGROUND_OPTIONS, READER_BACKGROUNDS);
+  for (const preset of READER_BACKGROUNDS) assert.deepEqual(resolveReaderBackground(preset.key), preset);
+  assert.equal(resolveReaderBackground('unknown').key, 'dark');
+  // Resolution takes only the stored preference, so no appearance or identity can influence it.
+  assert.equal(resolveReaderBackground.length, 1);
+  const colours = (key) => resolveReaderBackground(key);
   for (const preset of READER_BACKGROUNDS) {
-    assert.deepEqual(resolveReaderBackground(preset.key, null), preset);
+    for (const appearance of [...CONCRETE_APPEARANCES, 'system']) {
+      for (const identity of IDENTITY_KEYS) {
+        const prefs = normalizeThemePrefs({ theme: identity, appearance, readerBackground: preset.key });
+        assert.equal(prefs.readerBackground, preset.key);
+        assert.deepEqual(colours(prefs.readerBackground), preset);
+      }
+    }
   }
-  const appPalette = resolveActivePalette('amoled', 'honya');
-  assert.equal(resolveReaderBackground('app', appPalette).bg, appPalette.background);
-  assert.equal(resolveReaderBackground('app', appPalette).fg, appPalette.text);
-  assert.equal(resolveReaderBackground('unknown', null).key, 'dark');
+});
+
+check("the retired 'app' reader background migrates once to the matching preset and then stays put", () => {
+  assert.equal(normalizeThemePrefs({ theme: 'honya', appearance: 'amoled', readerBackground: 'app' }).readerBackground, 'black');
+  assert.equal(normalizeThemePrefs({ theme: 'ocean', appearance: 'dark', readerBackground: 'app' }).readerBackground, 'dark');
+  assert.equal(normalizeThemePrefs({ theme: 'coffee', appearance: 'light', readerBackground: 'app' }).readerBackground, 'white');
+  assert.equal(normalizeThemePrefs({ theme: 'ocean', readerBackground: 'app' }).readerBackground, 'dark'); // legacy: appearance inferred
+  assert.equal(normalizeThemePrefs({ theme: 'ocean', appearance: 'system', readerBackground: 'app' }).readerBackground, 'dark');
+  assert.equal(migrateReaderBackground('sepia', 'light'), 'sepia');
+  const once = normalizeThemePrefs({ theme: 'coffee', appearance: 'light', readerBackground: 'app' });
+  assert.deepEqual(normalizeThemePrefs(once), once);
+  assert.equal(normalizeThemePrefs({ theme: 'ocean', appearance: 'dark' }).readerBackground, undefined);
+});
+
+check('System appearance resolves from the device scheme; AMOLED is never inferred', () => {
+  assert.deepEqual(APPEARANCE_KEYS, ['system', 'light', 'dark', 'amoled']);
+  assert.equal(resolveAppearance('system', 'light'), 'light');
+  assert.equal(resolveAppearance('system', 'dark'), 'dark');
+  assert.equal(resolveAppearance('system', null), 'dark');
+  assert.equal(resolveAppearance('system', undefined), 'dark');
+  for (const scheme of ['light', 'dark', null]) {
+    assert.equal(resolveAppearance('light', scheme), 'light');
+    assert.equal(resolveAppearance('dark', scheme), 'dark');
+    assert.equal(resolveAppearance('amoled', scheme), 'amoled');
+  }
+  assert.notEqual(resolveAppearance('system', 'dark'), 'amoled');
+  assert.equal(resolveAppearance('bogus', 'light'), DEFAULT_APPEARANCE_KEY);
+  for (const identity of IDENTITY_KEYS) {
+    assert.equal(resolveActivePalette('system', identity, 'light'), resolveActivePalette('light', identity));
+    assert.equal(resolveActivePalette('system', identity, 'dark'), resolveActivePalette('dark', identity));
+    assert.equal(resolveActivePalette('system', identity, 'dark').isDark, true);
+    assert.equal(resolveActivePalette('system', identity, 'light').isDark, false);
+    assert.notEqual(resolveActivePalette('system', identity, 'dark').appearance, 'amoled');
+  }
+});
+
+check('a device scheme change updates System but leaves manual modes and the identity alone', () => {
+  const system = { theme: 'forest', appearance: 'system' };
+  const manual = { theme: 'forest', appearance: 'amoled' };
+  const lightSys = selectActivePalette(system, 'light');
+  const darkSys = selectActivePalette(system, 'dark');
+  assert.notEqual(lightSys.background, darkSys.background);
+  assert.equal(lightSys.identityKey, 'forest');
+  assert.equal(darkSys.identityKey, 'forest');
+  assert.equal(selectActivePalette(manual, 'light'), selectActivePalette(manual, 'dark'));
+  assert.equal(selectActivePalette(manual, 'light').background, '#000000');
+  // Switching appearance never touches the stored identity, and the choice survives a restart.
+  for (const appearance of APPEARANCE_KEYS) {
+    const prefs = normalizeThemePrefs(JSON.parse(JSON.stringify({ ...system, appearance })));
+    assert.equal(prefs.theme, 'forest');
+    assert.equal(prefs.appearance, appearance);
+  }
 });
 
 check('locale files retain all prior keys and values and gain all appearance keys', () => {
@@ -181,10 +244,10 @@ check('locale files retain all prior keys and values and gain all appearance key
     'settingsBackup.includedSettings', 'starterGuide.theme.title', 'starterGuide.theme.body',
     'settingsTheme.appearanceTitle', 'settingsTheme.appearanceSubtitle',
     'settingsTheme.identityTitle', 'settingsTheme.identitySubtitle',
+    'appearance.system.name', 'appearance.system.description',
     'appearance.light.name', 'appearance.light.description',
     'appearance.dark.name', 'appearance.dark.description',
     'appearance.amoled.name', 'appearance.amoled.description',
-    'reader.backgroundApp',
     ...IDENTITY_KEYS.flatMap((key) => [`theme.${key}.name`, `theme.${key}.description`]),
   ];
   const entries = (source) => new Map(
@@ -204,6 +267,7 @@ check('locale files retain all prior keys and values and gain all appearance key
       continue;
     }
     for (const [key, value] of entries(previous)) {
+      if (key === 'reader.backgroundApp') continue; // retired with the 'app' reader background
       assert.equal(current.get(key), value, `${locale}.js changed or removed '${key}'`);
     }
   }
@@ -220,12 +284,12 @@ check('active palette is wired into root chrome, navigation, and all reader surf
   assert.match(header, /theme\.isDark/);
 
   const chapter = source('../app/reader/[chapterId].js');
-  assert.match(chapter, /useAppTheme\(\)/);
-  assert.match(chapter, /resolveReaderBackground\(/);
+  assert.doesNotMatch(chapter, /useAppTheme/); // the reader never reads the app palette for its background
+  assert.match(chapter, /resolveReaderBackground\(prefs\.readerBackground\)/);
   assert.match(chapter, /READER_BACKGROUND_OPTIONS/);
 
   const document = source('../app/document/[id].js');
-  assert.match(document, /resolveReaderBackground\(/);
+  assert.match(document, /resolveReaderBackground\(prefs\.readerBackground\)/);
   assert.match(document, /READER_BACKGROUND_OPTIONS/);
 
   const readerSettings = source('../app/settings/reader.js');
@@ -240,7 +304,6 @@ check('active palette is wired into root chrome, navigation, and all reader surf
 });
 
 check('palette and appearance key sets stay in sync with the resolver', () => {
-  assert.deepEqual(APPEARANCE_KEYS, ['light', 'dark', 'amoled']);
   for (const key of APPEARANCE_KEYS) assert.equal(isAppearanceKey(key), true);
   for (const key of IDENTITY_KEYS) assert.equal(isThemeKey(key), true);
   assert.equal(isAppearanceKey('honya'), false);

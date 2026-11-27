@@ -16,7 +16,7 @@ import Ripple from '../../components/Ripple';
 import { Chip, Field } from '../../components/MD3';
 import EpubReader from '../../components/EpubReader';
 import PdfReader from '../../components/PdfReader';
-import { ensureDocumentCover } from '../../lib/documents';
+import { clearEpubCache, ensureDocumentCover } from '../../lib/documents';
 
 const SAVE_DEBOUNCE_MS = 800;
 
@@ -42,7 +42,7 @@ export default function DocumentReaderScreen() {
   const prefs = useStore((s) => s.prefs);
   const setPref = useStore((s) => s.setPref);
   const refreshLibrary = useStore((s) => s.refreshLibrary);
-  const palette = resolveReaderBackground(prefs.readerBackground, theme);
+  const palette = resolveReaderBackground(prefs.readerBackground);
 
   const [novel, setNovel] = useState(null);
   const [doc, setDoc] = useState(null);
@@ -120,6 +120,7 @@ export default function DocumentReaderScreen() {
   useEffect(
     () => () => {
       flush();
+      clearEpubCache(); // the archive is held whole in memory; don't keep it after leaving the book
       refreshLibrary();
     },
     [flush, refreshLibrary],
@@ -435,7 +436,6 @@ export default function DocumentReaderScreen() {
         <Text style={{ color: theme.text, fontWeight: '800', fontSize: 13, marginTop: 10 }}>{t('reader.background')}</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 10 }}>
           {READER_BACKGROUND_OPTIONS.map((b) => {
-            const option = resolveReaderBackground(b.key, theme);
             return (
               <Ripple key={b.key} onPress={() => setPref('readerBackground', b.key)}>
                 <View
@@ -443,14 +443,14 @@ export default function DocumentReaderScreen() {
                     width: 46,
                     height: 46,
                     borderRadius: RADIUS.md,
-                    backgroundColor: option.bg,
+                    backgroundColor: b.bg,
                     borderWidth: prefs.readerBackground === b.key ? 2 : 1,
                     borderColor: prefs.readerBackground === b.key ? theme.primary : theme.outline,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Text style={{ color: option.fg, fontWeight: '800' }}>A</Text>
+                  <Text style={{ color: b.fg, fontWeight: '800' }}>A</Text>
                 </View>
               </Ripple>
             );

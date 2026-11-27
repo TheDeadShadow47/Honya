@@ -1,44 +1,49 @@
 import { ScrollView, Switch, Text, View } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { useStore } from '../../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useI18n } from '../../hooks/useI18n';
 import { Chip, SectionLabel, Surface } from '../../components/MD3';
 import Ripple from '../../components/Ripple';
 import { RADIUS } from '../../theme/theme';
-import { READER_BACKGROUND_OPTIONS, resolveReaderBackground } from '../../theme/palette';
+import { READER_BACKGROUND_OPTIONS } from '../../theme/palette';
 
 export default function ReaderSettingsScreen() {
   const theme = useAppTheme();
   const { t } = useI18n();
-  const { prefs, setPref } = useStore();
+  const { prefs, setPref } = useStore(useShallow((s) => ({ prefs: s.prefs, setPref: s.setPref })));
 
   return (
     <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
       <SectionLabel>{t('settingsReader.background')}</SectionLabel>
-      <Surface level={1} style={{ padding: 16, marginBottom: 18, flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+      {/* One row of equal cells: every swatch and label has the same size on any width, and the
+          constant 2px border means selecting an option never shifts the layout. */}
+      <Surface level={1} style={{ padding: 14, marginBottom: 18, flexDirection: 'row', gap: 8 }}>
         {READER_BACKGROUND_OPTIONS.map((b) => {
-          const option = resolveReaderBackground(b.key, theme);
+          const selected = prefs.readerBackground === b.key;
           return (
-            <Ripple key={b.key} onPress={() => setPref('readerBackground', b.key)}>
-              <View style={{ alignItems: 'center', gap: 6 }}>
+            <Ripple key={b.key} onPress={() => setPref('readerBackground', b.key)} style={{ flex: 1, minWidth: 0 }}>
+              <View style={{ alignItems: 'stretch', gap: 6 }}>
                 <View
                   style={{
-                    width: 52,
-                    height: 52,
+                    height: 48,
                     borderRadius: RADIUS.md,
-                    backgroundColor: option.bg,
-                    borderWidth: prefs.readerBackground === b.key ? 2 : 1,
-                    borderColor: prefs.readerBackground === b.key ? theme.primary : theme.outline,
+                    backgroundColor: b.bg,
+                    borderWidth: 2,
+                    borderColor: selected ? theme.primary : theme.outline,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Text style={{ color: option.fg, fontWeight: '800' }}>Aa</Text>
+                  <Text style={{ color: b.fg, fontWeight: '800' }}>Aa</Text>
                 </View>
                 <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
                   style={{
-                    color: prefs.readerBackground === b.key ? theme.primary : theme.textMuted,
+                    color: selected ? theme.primary : theme.textMuted,
                     fontSize: 11,
                     fontWeight: '700',
                     textAlign: 'center',

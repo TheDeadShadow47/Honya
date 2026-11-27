@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useI18n } from '../../hooks/useI18n';
 import { SectionLabel, Surface } from '../../components/MD3';
@@ -45,7 +46,15 @@ export default function MoreScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
-  const { prefs, setPref, userRepositories, installedExtensions, library } = useStore();
+  const { prefs, setPref, userRepositories, installedExtensions, library } = useStore(
+    useShallow((s) => ({
+      prefs: s.prefs,
+      setPref: s.setPref,
+      userRepositories: s.userRepositories,
+      installedExtensions: s.installedExtensions,
+      library: s.library,
+    })),
+  );
 
   const cycleColumns = () => setPref('gridColumns', prefs.gridColumns >= 4 ? 2 : prefs.gridColumns + 1);
 

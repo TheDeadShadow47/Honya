@@ -46,10 +46,6 @@ const PdfReader = forwardRef(function PdfReader(
         liveScale.current = next;
         setScale(next);
       },
-      resetZoom: () => {
-        liveScale.current = 1;
-        setScale(1);
-      },
     }),
     [guard, onPage],
   );

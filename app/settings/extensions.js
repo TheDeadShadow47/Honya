@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, FlatList, Image, Text, View } from 'react-nat
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useI18n } from '../../hooks/useI18n';
 import { Button, Chip, Dialog, EmptyState, Field, SectionLabel } from '../../components/MD3';
@@ -91,7 +92,19 @@ export default function ExtensionsScreen() {
     refreshRepositories,
     installExtension,
     uninstallExtension,
-  } = useStore();
+  } = useStore(
+    useShallow((s) => ({
+      userRepositories: s.userRepositories,
+      repoCatalog: s.repoCatalog,
+      repoLoading: s.repoLoading,
+      repoError: s.repoError,
+      installedExtensions: s.installedExtensions,
+      addRepository: s.addRepository,
+      refreshRepositories: s.refreshRepositories,
+      installExtension: s.installExtension,
+      uninstallExtension: s.uninstallExtension,
+    })),
+  );
 
   const [tab, setTab] = useState('installed');
   const [dialogOpen, setDialogOpen] = useState(false);
