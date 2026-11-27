@@ -20,7 +20,7 @@ A minimal, offline-first novel reader built with **React Native and Expo**, feat
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 <p align="center">
   <img src="screenshots/1.jpeg" alt="Honya Screenshot 1" width="32%">
@@ -30,7 +30,7 @@ A minimal, offline-first novel reader built with **React Native and Expo**, feat
 
 ---
 
-## 📖 Overview
+## Overview
 
 Honya turns novel reading into a clean, self-contained mobile experience — no bundled sources, no bloat. Every extension is fetched from a plugin repository you choose, downloaded only when you tap **Install**, and evaluated in a sandboxed runtime so you stay in control of what code runs on your device.
 
@@ -38,66 +38,66 @@ Under the hood, Honya pairs an LNReader-compatible plugin engine with a hand-rol
 
 ---
 
-## ✨ Features
+## Features
 
-- 📜 **Continuous scrolling reader** — chapters load automatically as you scroll, no "Next" button required
-- 🔊 **Text-to-speech** — listen to the chapter you're reading with the device's native speech engine, with pause / resume and progress tracking
-- 📥 **Reliable background downloads** — long download batches keep processing even when Honya is in the background, and stay in sync with Download Manager
-- ⬇️ **Download Manager** — track, pause, and cancel queued chapter downloads
-- 📶 **Offline reading** — read downloaded chapters without a connection; progress saved locally via SQLite
-- 🔄 **Automatic & manual library updates** — keep your library in sync with the latest chapters, smooth even for large libraries
-- 🔔 **Notifications** — download / update progress and results, keeping background activity visible without requiring the app to stay open
-- 🕐 **In-app updates** — check for new versions, download updates, and launch the Android installation flow from inside Honya
-- 🧭 **Starter Guide** — a skippable onboarding tour on first launch, with inline setup for backups, repositories, and theme
-- 🔖 **Per-chapter progress** — scroll position and read status tracked per chapter
-- ✅ **Advanced chapter selection** — long-press for bulk download, mark, or remove
-- 🔍 **Filter / sort / display** — downloaded-unread filters, sort by number or date, toggle row metadata
-- 🎚 **Reading customization** — font size, line height, padding, and 5 reader background presets
-- 📚 **Library** — grid view with unread badges, progress bars, and search
-- 🆕 **Updates feed** — chronological new-chapter list, grouped by day
-- 🕘 **History** — recently read chapters sorted by last-read time
-- 🧩 **Plugin repository system** — add any number of repositories via URL
-- ⚙️ **LNReader-compatible engine** — sandboxed runtime using `cheerio`, `htmlparser2`, `dayjs`, and a fixed shim table
-- 🎨 **15 built-in themes** — dark, light, and OLED color schemes for every taste
-- 🌍 **Five languages** — English, Français, العربية, Deutsch, and Italiano, with Arabic RTL support
-- 🚀 **Performance tuned** — smooth and responsive even with large libraries and long chapter lists
-- 🚫 **No default sources** — every extension is user-provided, nothing runs until you install it
-
----
-
-## 🆕 What's New in 1.5.0
-
-- 📖 **Paged reading mode** — read one page at a time instead of endless scroll. Pages re-flow with your font size, spacing and padding, and work right-to-left for Arabic text. Continuous scroll is still the default.
-- 📄 **Local EPUB and PDF** — import books from your device and read them in the same reader, kept separate from online novels, backups and update checks.
-- 📜 **Optional page-turn animation** — in paged mode you can turn on a paper-style page curl: drag a page from its edge or corner and it rolls over like real paper (shaded rolled edge, faint show-through of the text on the back, a shadow on the page beneath), or tap to turn. It is **off by default**, only applies to paged mode, and is skipped when the system asks for reduced motion.
-- 🩹 **Steadier PDF scrolling** — fixed imported PDFs jumping or resetting while you scroll; pinch zoom and page jumps no longer reload the document.
-- 🖼️ **Covers for local books** — imported PDFs get their first page as a cover, and EPUBs without an embedded cover use artwork from their opening pages.
+- **Continuous scrolling reader** — chapters load automatically as you scroll, no "Next" button required
+- **Text-to-speech** — listen to the chapter you're reading with the device's native speech engine, with pause / resume and progress tracking
+- **Reliable background downloads** — long download batches keep processing even when Honya is in the background, and stay in sync with Download Manager
+- **Download Manager** — track, pause, and cancel queued chapter downloads
+- **Offline reading** — read downloaded chapters without a connection; progress saved locally via SQLite
+- **Automatic & manual library updates** — keep your library in sync with the latest chapters, smooth even for large libraries
+- **Notifications** — download / update progress and results, keeping background activity visible without requiring the app to stay open
+- **In-app updates** — check for new versions, download updates, and launch the Android installation flow from inside Honya
+- **Starter Guide** — a skippable onboarding tour on first launch, with inline setup for backups, repositories, and theme
+- **Per-chapter progress** — scroll position and read status tracked per chapter
+- **Advanced chapter selection** — long-press for bulk download, mark, or remove
+- **Filter / sort / display** — downloaded-unread filters, sort by number or date, toggle row metadata
+- **Reading customization** — font size, line height, padding, and 5 reader background presets
+- **Library** — grid view with unread badges, progress bars, and search
+- **Updates feed** — chronological new-chapter list, grouped by day
+- **History** — recently read chapters sorted by last-read time
+- **Plugin repository system** — add any number of repositories via URL
+- **LNReader-compatible engine** — sandboxed runtime using `cheerio`, `htmlparser2`, `dayjs`, and a fixed shim table
+- **15 built-in themes** — dark, light, and OLED color schemes for every taste
+- **Five languages** — English, Français, العربية, Deutsch, and Italiano, with Arabic RTL support
+- **Performance tuned** — smooth and responsive even with large libraries and long chapter lists
+- **No default sources** — every extension is user-provided, nothing runs until you install it
 
 ---
 
-## 🆕 What's New in 1.4.2
+## What's New in 1.5.0
 
-- 🔊 **Listen — text-to-speech in the reader** — any chapter can now be read aloud with the device's native speech engine. Pause and resume mid-chapter, watch a "Reading _n_ of _m_" indicator, and rely on paragraph-aware chunking so long chapters are never cut off mid-sentence.
-- 🧭 **Starter Guide** — new installs get a short, fully skippable tour that walks through backups, plugin repositories, notifications, themes, and the library, with one-tap setup actions inline. Existing installs are detected automatically and never see it.
-- 🕐 **Background update checks** — Honya now also checks for new releases from an OS-scheduled background task and quietly notifies you when one is available, on top of the existing foreground check. Still throttled to once a day; downloading and installing remain user-initiated.
-- 🩹 **Updater fixes** — the update manager reconciles its saved state against the version that is actually running, so a just-installed update no longer lingers as "ready to install", and obsolete downloaded APKs are cleaned up.
-- 📶 **Quieter offline handling** — opening a novel with no connection now keeps the local record and downloaded chapters on screen with a light notice, instead of a blocking error dialog.
-- ✨ **Cleaner chapter text** — stray `undefined` tokens that some plugins accidentally glue into chapter prose (a string-concatenation bug on their side) are stripped before the text is displayed or spoken.
-
----
-
-## 🆕 What's New in 1.4.0
-
-- 🚀 **Expo SDK 57** — Honya's underlying Expo / React Native stack was modernized for better compatibility with newer Android versions and the latest APIs and dependencies.
-- 📥 **More reliable background downloads** — sequential download queues keep processing reliably in the background, and progress stays synchronized with the Download Manager even when the app isn't in the foreground.
-- 🔄 **Improved library updates** — faster, more reliable manual and automatic library updates that handle large libraries cleanly with better progress and state reporting.
-- 🌍 **German & Italian** — two new UI languages, for five total (English, Français, العربية, Deutsch, Italiano); Arabic RTL support is preserved.
-- ⚡ **Performance improvements** — snappier filtering and scrolling in large chapter lists, with smoother read/download state synchronization.
-- 🛠️ **Codebase cleanup** — updated APIs, removed deprecated code, and improved project consistency following the migration.
+- **Paged reading mode** — read one page at a time instead of endless scroll. Pages re-flow with your font size, spacing and padding, and work right-to-left for Arabic text. Continuous scroll is still the default.
+- **Local EPUB and PDF** — import books from your device and read them in the same reader, kept separate from online novels, backups and update checks.
+- **Optional page-turn animation** — in paged mode you can turn on a paper-style page curl: drag a page from its edge or corner and it rolls over like real paper (shaded rolled edge, faint show-through of the text on the back, a shadow on the page beneath), or tap to turn. It is **off by default**, only applies to paged mode, and is skipped when the system asks for reduced motion.
+- **Steadier PDF scrolling** — fixed imported PDFs jumping or resetting while you scroll; pinch zoom and page jumps no longer reload the document.
+- **Covers for local books** — imported PDFs get their first page as a cover, and EPUBs without an embedded cover use artwork from their opening pages.
 
 ---
 
-## 🎨 Theming
+## What's New in 1.4.2
+
+- **Listen — text-to-speech in the reader** — any chapter can now be read aloud with the device's native speech engine. Pause and resume mid-chapter, watch a "Reading _n_ of _m_" indicator, and rely on paragraph-aware chunking so long chapters are never cut off mid-sentence.
+- **Starter Guide** — new installs get a short, fully skippable tour that walks through backups, plugin repositories, notifications, themes, and the library, with one-tap setup actions inline. Existing installs are detected automatically and never see it.
+- **Background update checks** — Honya now also checks for new releases from an OS-scheduled background task and quietly notifies you when one is available, on top of the existing foreground check. Still throttled to once a day; downloading and installing remain user-initiated.
+- **Updater fixes** — the update manager reconciles its saved state against the version that is actually running, so a just-installed update no longer lingers as "ready to install", and obsolete downloaded APKs are cleaned up.
+- **Quieter offline handling** — opening a novel with no connection now keeps the local record and downloaded chapters on screen with a light notice, instead of a blocking error dialog.
+- **Cleaner chapter text** — stray `undefined` tokens that some plugins accidentally glue into chapter prose (a string-concatenation bug on their side) are stripped before the text is displayed or spoken.
+
+---
+
+## What's New in 1.4.0
+
+- **Expo SDK 57** — Honya's underlying Expo / React Native stack was modernized for better compatibility with newer Android versions and the latest APIs and dependencies.
+- **More reliable background downloads** — sequential download queues keep processing reliably in the background, and progress stays synchronized with the Download Manager even when the app isn't in the foreground.
+- **Improved library updates** — faster, more reliable manual and automatic library updates that handle large libraries cleanly with better progress and state reporting.
+- **German & Italian** — two new UI languages, for five total (English, Français, العربية, Deutsch, Italiano); Arabic RTL support is preserved.
+- **Performance improvements** — snappier filtering and scrolling in large chapter lists, with smoother read/download state synchronization.
+- **Codebase cleanup** — updated APIs, removed deprecated code, and improved project consistency following the migration.
+
+---
+
+## Theming
 
 Honya ships with 15 built-in themes — dark, light, OLED, and colorful options for every taste — switchable from **Settings → Theme**:
 
@@ -123,23 +123,23 @@ Every UI element reads from a single `THEMES` table (`background`, `surface`, `s
 
 ---
 
-## 🌍 Languages
+## Languages
 
 Honya's interface is available in **five languages**, switchable from **Settings → Language**:
 
 | Language | Code |
 |---|---|
-| English 🇬🇧 | `en` |
-| Français 🇫🇷 | `fr` |
-| العربية 🇸🇦 | `ar` |
-| Deutsch 🇩🇪 | `de` |
-| Italiano 🇮🇹 | `it` |
+| English | `en` |
+| Français | `fr` |
+| العربية | `ar` |
+| Deutsch | `de` |
+| Italiano | `it` |
 
 **Deutsch and Italiano were added in v1.4.0**, joining English, French, and Arabic. Arabic is fully supported with **RTL (right-to-left) layout**.
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 | Layer | Choice |
 |---|---|
@@ -153,7 +153,7 @@ Honya's interface is available in **five languages**, switchable from **Settings
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```text
 app/
@@ -254,7 +254,7 @@ assets/
 
 ---
 
-## 🧩 Plugin Engine
+## Plugin Engine
 
 Honya uses a sandboxed `new Function(...)` runtime. Plugin code runs with shadowed globals — `process`, `global`, `globalThis`, `window`, `document`, `__DEV__` — so it cannot reach the native environment. The only allowed `require()` calls are:
 
@@ -275,7 +275,7 @@ Plugins expose a standard API (`popular()`, `latest()`, `search()`, `novel()`, `
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 Clone the repository
 
@@ -305,7 +305,7 @@ npm run ios             # Launch on connected iOS device / simulator
 
 ---
 
-## 🔌 Adding a Plugin Repository
+## Adding a Plugin Repository
 
 1. Open **More → Repositories**
 2. Paste a full `https://…` URL pointing to a JSON repository catalog
@@ -317,7 +317,7 @@ The app has no default repositories — every source is user-provided.
 
 ---
 
-## 💾 Storage & Data
+## Storage & Data
 
 - **SQLite database** — `expo-sqlite` with WAL mode, busy timeout, and a serialized I/O queue to prevent `SQLITE_BUSY`
 - **AsyncStorage prefs** — user preferences (theme, reader settings, repository list) persisted as JSON
@@ -327,7 +327,7 @@ The app has no default repositories — every source is user-provided.
 
 ---
 
-## ⚙️ Settings
+## Settings
 
 | Screen | What it does |
 |---|---|
@@ -345,7 +345,7 @@ The app has no default repositories — every source is user-provided.
 
 ---
 
-## 🔮 Future Improvements
+## Future Improvements
 
 Potential additions include:
 
@@ -356,13 +356,13 @@ Potential additions include:
 
 ---
 
-## 📄 License
+## License
 
 This project is available under the **MIT License**.
 
 ---
 
-## 🙏 Credits
+## Credits
 
 ### LNReader
 
@@ -378,8 +378,8 @@ Built with the [Expo](https://expo.dev) platform and its open-source SDK.
 
 <div align="center">
 
-### 📖 "Every story deserves a good reader."
+### "Every story deserves a good reader."
 
-Built with ❤️ for offline-first reading.
+Built with for offline-first reading.
 
 </div>
