@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useStore } from '../../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useI18n } from '../../hooks/useI18n';
 import { SectionLabel, Surface } from '../../components/MD3';
 import Ripple from '../../components/Ripple';
@@ -12,7 +13,9 @@ export default function AboutScreen() {
   const theme = useAppTheme();
   const { t } = useI18n();
   const router = useRouter();
-  const { userRepositories, installedExtensions, appUpdateState } = useStore();
+  const { userRepositories, installedExtensions, appUpdateState } = useStore(
+    useShallow((s) => ({ userRepositories: s.userRepositories, installedExtensions: s.installedExtensions, appUpdateState: s.appUpdateState })),
+  );
 
   const hasUpdate = appUpdateState.latestRelease && !appUpdateState.downloadedVersion;
   const hasDownloaded = !!appUpdateState.downloadedVersion;

@@ -11,9 +11,11 @@ import { loadPlugin, pluginApi } from '../../lib/pluginEngine';
 import { sanitizeChapter } from '../../lib/clean';
 import { decodeNavParam, encodeNavParam } from '../../lib/navIds';
 import { setPendingReader, takePendingReader } from '../../lib/readerContext';
-import { RADIUS, READER_BACKGROUNDS } from '../../theme/theme';
+import { RADIUS } from '../../theme/theme';
+import { isPaletteDark, READER_BACKGROUND_OPTIONS, resolveReaderBackground } from '../../theme/palette';
 import { isArabicText } from '../../lib/i18n';
 import Ripple from '../../components/Ripple';
+import PagedReader from '../../components/PagedReader';
 import * as tts from '../../lib/tts';
 
 const OFFLINE_RE = /Network request failed|Failed to fetch|fetch failed|Network is unreachable|Unable to resolve host|ENETUNREACH|ECONNRESET|ECONNREFUSED|timeout|timed out/i;
@@ -94,7 +96,13 @@ export default function ReaderScreen() {
   const bootCtxRef = useRef(null);
   if (bootCtxRef.current?.id !== id) {
     const taken = takePendingReader(id);
-    bootCtxRef.current = { id, name: taken?.name, novelId: taken?.novelId, novelTitle: taken?.novelTitle };
+    bootCtxRef.current = {
+      id,
+      name: taken?.name,
+      novelId: taken?.novelId,
+      novelTitle: taken?.novelTitle,
+      startAtEnd: !!taken?.startAtEnd, // set when paging backwards across a chapter boundary
+    };
   }
   const ctx = bootCtxRef.current;
 
@@ -106,7 +114,9 @@ export default function ReaderScreen() {
   const downloadChapter = useStore((s) => s.downloadChapter);
   const removeDownload = useStore((s) => s.removeDownload);
 
-  const palette = READER_BACKGROUNDS.find((b) => b.key === prefs.readerBackground) ?? READER_BACKGROUNDS[1];
+  const palette = resolveReaderBackground(prefs.readerBackground);
+  // Infinite scroll stays the default; anything other than an explicit 'paged' preference is scroll.
+  const paged = prefs.readingMode === 'paged';
 
   const [chapter, setChapter] = useState(null);
   const [novel, setNovel] = useState(() =>
@@ -266,7 +276,7 @@ export default function ReaderScreen() {
         // "Mark read on open" applies to chapters the reader auto-opens too.
         if (prefsRef.current.markReadOnOpen && !markedIdsRef.current.has(next.id)) {
           markedIdsRef.current.add(next.id);
-          db.markChapterRead(next.id, true).then(() => refreshLibrary());
+          db.markChapterRead(next.id, true).then(() => refreshLibrary()).catch(() => {});
         }
       }
     } finally {
@@ -426,12 +436,7 @@ export default function ReaderScreen() {
     heightsRef.current[index] = height;
   }, []);
 
-  /**
-   * Restores the previous scroll position once the chapter body has been laid
-   * out, then keeps appending while chapters are too short to fill the screen.
-   * Runs once per chapter and only when there is meaningful progress, so a
-   * fresh chapter still starts at the top.
-   */
+  // Restores saved scroll once laid out, then appends chapters while the list is too short to scroll.
   const handleContentSizeChange = useCallback(
     (_w, height) => {
       if (loading) return;
@@ -476,7 +481,7 @@ export default function ReaderScreen() {
             db.saveChapterProgress(prevSeg.id, 1).catch(() => {});
             if (!prefsRef.current.markReadOnOpen && !markedIdsRef.current.has(prevSeg.id)) {
               markedIdsRef.current.add(prevSeg.id);
-              db.markChapterRead(prevSeg.id, true).then(refreshLibrary);
+              db.markChapterRead(prevSeg.id, true).then(refreshLibrary).catch(() => {});
             } else {
               markedIdsRef.current.add(prevSeg.id);
             }
@@ -490,7 +495,6 @@ export default function ReaderScreen() {
         setActiveIndex(idx);
         if (idx === segs.length - 1) appendNextSegment();
       } else {
-        // Within one chapter: track a local ratio.
         const seg = segs[idx];
         if (seg) {
           const top = segOffset(heightsRef.current, contentPadTop, idx);
@@ -507,11 +511,10 @@ export default function ReaderScreen() {
         }
       }
 
-      // Mark the last chapter read when the reader hits the very end.
       const reachedEnd = y + layoutMeasurement.height >= contentSize.height - 80;
       if (reachedEnd && idx === segs.length - 1 && lastId && !prefsRef.current.markReadOnOpen && !markedIdsRef.current.has(lastId)) {
         markedIdsRef.current.add(lastId);
-        db.markChapterRead(lastId, true).then(refreshLibrary);
+        db.markChapterRead(lastId, true).then(refreshLibrary).catch(() => {});
       }
 
       // Prefetch the next chapter as the bottom approaches (also covers fast scrolls).
@@ -523,7 +526,6 @@ export default function ReaderScreen() {
     [loading, appendNextSegment, refreshLibrary, contentPadTop],
   );
 
-  // Flush every chapter's last known position when leaving the screen.
   useEffect(() => {
     return () => {
       progressMapRef.current.forEach((ratio, cid) => {
@@ -556,12 +558,73 @@ export default function ReaderScreen() {
     [settingsOpen],
   );
 
-  const goTo = (target) => {
+  const goTo = (target, { startAtEnd = false } = {}) => {
     if (!target) return;
     setSettingsOpen(false);
     setUiVisible(false);
-    setPendingReader({ id: target.id, name: target.name, novelId: target.novelId });
+    setPendingReader({ id: target.id, name: target.name, novelId: target.novelId, startAtEnd });
     router.replace(`/reader/${encodeNavParam(target.id)}`);
+  };
+
+  // Progress from the pager feeds the same maps/DB writes the scroll reader uses, so history,
+  // "continue reading" and the library progress bar behave identically in both modes.
+  const handlePagedChange = useCallback(
+    ({ ratio, isLast }) => {
+      const seg = segmentsRef.current[0];
+      if (!seg?.ch) return;
+      if (bootCtxRef.current) bootCtxRef.current.startAtEnd = false; // one-shot: later remounts must not jump to the end
+      progressMapRef.current.set(seg.id, ratio);
+      progressRef.current = ratio;
+      const now = Date.now();
+      if (ratio > 0 && (isLast || now - lastSaveRef.current > 1000)) {
+        lastSaveRef.current = now;
+        db.saveChapterProgress(seg.id, ratio).catch(() => {});
+      }
+      if (isLast && !prefsRef.current.markReadOnOpen && !markedIdsRef.current.has(seg.id)) {
+        markedIdsRef.current.add(seg.id);
+        db.markChapterRead(seg.id, true).then(refreshLibrary).catch(() => {});
+      }
+    },
+    [refreshLibrary],
+  );
+
+  const handlePagedEdge = useCallback(
+    (dir) => {
+      const seg = segmentsRef.current[0];
+      if (dir === 'next' && neighbours.next) {
+        if (seg?.id) {
+          progressMapRef.current.set(seg.id, 1);
+          db.saveChapterProgress(seg.id, 1).catch(() => {});
+        }
+        goTo(neighbours.next);
+      } else if (dir === 'prev' && neighbours.prev) {
+        goTo(neighbours.prev, { startAtEnd: true });
+      }
+    },
+    [neighbours], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const handlePagedTap = useCallback(() => {
+    if (settingsOpen) setSettingsOpen(false);
+    else setUiVisible((v) => !v);
+  }, [settingsOpen]);
+
+  const handlePagedDragStart = useCallback(() => {
+    setUiVisible(false);
+    setSettingsOpen(false);
+  }, []);
+
+  const switchReadingMode = async (mode) => {
+    if ((mode === 'paged') === paged) return;
+    const seg = segmentsRef.current[activeIndexRef.current];
+    if (seg?.ch) {
+      const ratio = progressMapRef.current.get(seg.id) ?? progressRef.current ?? 0;
+      if (ratio > 0) db.saveChapterProgress(seg.id, ratio).catch(() => {});
+    }
+    restoredRef.current = false; // let the scroll view re-apply the saved ratio when it mounts
+    await setPref('readingMode', mode);
+    // Paged mode shows exactly one chapter, so if infinite scroll had advanced into a later chapter, reopen that one.
+    if (mode === 'paged' && activeIndexRef.current > 0 && seg?.ch) goTo(seg.ch);
   };
 
   const activeSeg = segments[activeIndex] ?? null;
@@ -569,7 +632,6 @@ export default function ReaderScreen() {
   const isDownloading = downloadStates[activeId] === 'downloading';
   const isDownloaded = !!activeSeg?.ch?.downloadedText;
 
-  /** Re-read a chapter row after download/removal so the rendered segment updates. */
   const refreshSegment = useCallback(
     async (chapterId) => {
       const row = await db.getChapter(chapterId);
@@ -657,13 +719,10 @@ export default function ReaderScreen() {
     if (settingsOpen) setSettingsOpen(false);
   }, [settingsOpen]);
 
-  /* ---------- text-to-speech ("Listen") ---------- */
-
   const [ttsState, setTtsState] = useState(() => tts.getState());
   useEffect(() => tts.subscribe(setTtsState), []);
 
-  // A hard chapter switch (prev/next, or leaving the reader) always stops any active
-  // session — TTS is scoped to one chapter at a time, per the MVP scope.
+  // A hard chapter switch stops TTS: sessions are scoped to one chapter.
   useEffect(() => {
     return () => tts.stop();
   }, [id]);
@@ -692,9 +751,36 @@ export default function ReaderScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.bg }}>
-      <StatusBar hidden={!uiVisible} />
+      <StatusBar hidden={!uiVisible} style={isPaletteDark(palette) ? 'light' : 'dark'} />
 
-      <View style={{ flex: 1 }} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+      <View
+        style={{ flex: 1 }}
+        onTouchStart={paged ? undefined : handleTouchStart}
+        onTouchEnd={paged ? undefined : handleTouchEnd}
+      >
+        {paged && !loading && !error && segments[0]?.status === 'ready' ? (
+          <PagedReader
+            key={segments[0].id}
+            text={segments[0].text}
+            rtl={segments[0].rtl}
+            palette={palette}
+            fontSize={prefs.fontSize}
+            lineHeight={prefs.lineHeight}
+            horizontalPadding={prefs.horizontalPadding}
+            chapterName={segments[0].name}
+            initialRatio={progressRef.current}
+            startAtEnd={ctx?.startAtEnd}
+            hasPrev={!!neighbours.prev}
+            hasNext={!!neighbours.next}
+            topInset={insets.top}
+            bottomInset={insets.bottom}
+            chromeOpen={uiVisible || settingsOpen}
+            onPageChange={handlePagedChange}
+            onEdge={handlePagedEdge}
+            onTap={handlePagedTap}
+            onDragStart={handlePagedDragStart}
+          />
+        ) : (
         <ScrollView
           ref={scrollRef}
           style={{ flex: 1, direction: 'ltr' }}
@@ -769,6 +855,7 @@ export default function ReaderScreen() {
             ))
           )}
         </ScrollView>
+        )}
       </View>
 
       <Animated.View
@@ -904,7 +991,7 @@ export default function ReaderScreen() {
           left: 0,
           right: 0,
           bottom: 0,
-          transform: [{ translateY: slide.interpolate({ inputRange: [0, 1], outputRange: [480, 0] }) }],
+          transform: [{ translateY: slide.interpolate({ inputRange: [0, 1], outputRange: [560, 0] }) }],
           backgroundColor: palette.bg,
           borderTopLeftRadius: RADIUS.xl,
           borderTopRightRadius: RADIUS.xl,
@@ -928,26 +1015,60 @@ export default function ReaderScreen() {
           </View>
         </View>
 
-        <Text style={{ color: palette.fg, fontWeight: '800', fontSize: 13, marginTop: 16 }}>{t('reader.background')}</Text>
-        <View style={{ flexDirection: 'row', gap: 12, marginTop: 10 }}>
-          {READER_BACKGROUNDS.map((b) => (
-            <Ripple key={b.key} onPress={() => setPref('readerBackground', b.key)}>
-              <View
-                style={{
-                  width: 46,
-                  height: 46,
-                  borderRadius: RADIUS.md,
-                  backgroundColor: b.bg,
-                  borderWidth: prefs.readerBackground === b.key ? 2 : 1,
-                  borderColor: prefs.readerBackground === b.key ? palette.fg : palette.fg + '33',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Text style={{ color: b.fg, fontWeight: '800' }}>A</Text>
+        <Text style={{ color: palette.fg, fontWeight: '800', fontSize: 13, marginTop: 16 }}>{t('reader.readingMode')}</Text>
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+          {[
+            { key: 'scroll', icon: 'swap-vertical-outline', label: t('settingsReader.modeScroll') },
+            { key: 'paged', icon: 'swap-horizontal-outline', label: t('settingsReader.modePaged') },
+          ].map((m) => {
+            const active = (m.key === 'paged') === paged;
+            return (
+              <View key={m.key} style={{ flex: 1, borderRadius: RADIUS.md, overflow: 'hidden' }}>
+                <Ripple onPress={() => switchReadingMode(m.key)}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingVertical: 11,
+                      borderRadius: RADIUS.md,
+                      borderWidth: active ? 2 : 1,
+                      borderColor: active ? palette.fg : palette.fg + '33',
+                    }}
+                  >
+                    <Ionicons name={m.icon} size={17} color={palette.fg} />
+                    <Text style={{ color: palette.fg, fontWeight: active ? '800' : '600', fontSize: 13, marginLeft: 7 }}>
+                      {m.label}
+                    </Text>
+                  </View>
+                </Ripple>
               </View>
-            </Ripple>
-          ))}
+            );
+          })}
+        </View>
+
+        <Text style={{ color: palette.fg, fontWeight: '800', fontSize: 13, marginTop: 18 }}>{t('reader.background')}</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 10 }}>
+          {READER_BACKGROUND_OPTIONS.map((b) => {
+            return (
+              <Ripple key={b.key} onPress={() => setPref('readerBackground', b.key)}>
+                <View
+                  style={{
+                    width: 46,
+                    height: 46,
+                    borderRadius: RADIUS.md,
+                    backgroundColor: b.bg,
+                    borderWidth: prefs.readerBackground === b.key ? 2 : 1,
+                    borderColor: prefs.readerBackground === b.key ? palette.fg : palette.fg + '33',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ color: b.fg, fontWeight: '800' }}>A</Text>
+                </View>
+              </Ripple>
+            );
+          })}
         </View>
 
         <Text style={{ color: palette.fg, fontWeight: '800', fontSize: 13, marginTop: 18 }}>

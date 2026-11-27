@@ -84,6 +84,9 @@ export default function BrowsePluginScreen() {
   }, [instance, mode]);
   /* eslint-enable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
 
+  const cardWidth = (width - PADDING * 2 - GAP * (columns - 1)) / columns;
+  const renderItem = useCallback(({ item }) => <NovelCard novel={item} width={cardWidth} />, [cardWidth]);
+
   if (!record) {
     return (
       <EmptyState
@@ -95,7 +98,6 @@ export default function BrowsePluginScreen() {
     );
   }
 
-  const cardWidth = (width - PADDING * 2 - GAP * (columns - 1)) / columns;
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
@@ -127,7 +129,11 @@ export default function BrowsePluginScreen() {
         numColumns={columns}
         columnWrapperStyle={columns > 1 ? { gap: GAP } : undefined}
         contentContainerStyle={{ padding: PADDING, gap: GAP, flexGrow: 1 }}
-        renderItem={({ item }) => <NovelCard novel={item} width={cardWidth} />}
+        renderItem={renderItem}
+        removeClippedSubviews
+        initialNumToRender={columns * 4}
+        maxToRenderPerBatch={columns * 3}
+        windowSize={7}
         onEndReachedThreshold={0.6}
         onEndReached={() => !loading && mode !== 'search' && load(page + 1, false)}
         ListFooterComponent={loading ? <ActivityIndicator color={theme.primary} style={{ marginTop: 16 }} /> : null}

@@ -28,7 +28,7 @@ export default function RootLayout() {
   const lang = useStore((s) => s.prefs.lang);
   const showStarterGuide = useStore((s) => s.showStarterGuide);
   const theme = useAppTheme();
-  const isDark = isThemeDark(theme);
+  const isDark = theme.isDark ?? isThemeDark(theme);
   const { t } = useI18n();
   const router = useRouter();
   // Gate the notification prompt behind What's New so the two never stack on a fresh install.
@@ -104,6 +104,7 @@ export default function RootLayout() {
             <Stack.Screen name="downloads" options={{ title: t('downloads.title') }} />
             <Stack.Screen name="novel/migrate" options={{ title: t('novel.migrateTitle') }} />
             <Stack.Screen name="reader/[chapterId]" options={{ headerShown: false }} />
+            <Stack.Screen name="document/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="browse/[pluginId]" options={{ title: t('catalogs.browseSources') }} />
             <Stack.Screen name="settings/repositories" options={{ title: t('settingsRepositories.title') }} />
             <Stack.Screen name="settings/extensions" options={{ title: t('settingsExtensions.title') }} />

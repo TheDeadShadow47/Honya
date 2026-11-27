@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert, FlatList, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useI18n } from '../../hooks/useI18n';
 import { Button, Dialog, EmptyState, Field } from '../../components/MD3';
@@ -11,7 +12,15 @@ import { RADIUS } from '../../theme/theme';
 export default function RepositoriesScreen() {
   const theme = useAppTheme();
   const { t } = useI18n();
-  const { userRepositories, repoCatalog, addRepository, removeRepository, refreshRepositories } = useStore();
+  const { userRepositories, repoCatalog, addRepository, removeRepository, refreshRepositories } = useStore(
+    useShallow((s) => ({
+      userRepositories: s.userRepositories,
+      repoCatalog: s.repoCatalog,
+      addRepository: s.addRepository,
+      removeRepository: s.removeRepository,
+      refreshRepositories: s.refreshRepositories,
+    })),
+  );
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);

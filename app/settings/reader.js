@@ -1,50 +1,95 @@
 import { ScrollView, Switch, Text, View } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { useStore } from '../../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { useI18n } from '../../hooks/useI18n';
-import { SectionLabel, Surface } from '../../components/MD3';
+import { Chip, SectionLabel, Surface } from '../../components/MD3';
 import Ripple from '../../components/Ripple';
-import { RADIUS, READER_BACKGROUNDS } from '../../theme/theme';
+import { RADIUS } from '../../theme/theme';
+import { READER_BACKGROUND_OPTIONS } from '../../theme/palette';
 
 export default function ReaderSettingsScreen() {
   const theme = useAppTheme();
   const { t } = useI18n();
-  const { prefs, setPref } = useStore();
+  const { prefs, setPref } = useStore(useShallow((s) => ({ prefs: s.prefs, setPref: s.setPref })));
 
   return (
     <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
       <SectionLabel>{t('settingsReader.background')}</SectionLabel>
-      <Surface level={1} style={{ padding: 16, marginBottom: 18, flexDirection: 'row', gap: 12 }}>
-        {READER_BACKGROUNDS.map((b) => (
-          <Ripple key={b.key} onPress={() => setPref('readerBackground', b.key)}>
-            <View style={{ alignItems: 'center', gap: 6 }}>
-              <View
-                style={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: RADIUS.md,
-                  backgroundColor: b.bg,
-                  borderWidth: prefs.readerBackground === b.key ? 2 : 1,
-                  borderColor: prefs.readerBackground === b.key ? theme.primary : theme.outline,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Text style={{ color: b.fg, fontWeight: '800' }}>Aa</Text>
+      {/* One row of equal cells: every swatch and label has the same size on any width, and the
+          constant 2px border means selecting an option never shifts the layout. */}
+      <Surface level={1} style={{ padding: 14, marginBottom: 18, flexDirection: 'row', gap: 8 }}>
+        {READER_BACKGROUND_OPTIONS.map((b) => {
+          const selected = prefs.readerBackground === b.key;
+          return (
+            <Ripple key={b.key} onPress={() => setPref('readerBackground', b.key)} style={{ flex: 1, minWidth: 0 }}>
+              <View style={{ alignItems: 'stretch', gap: 6 }}>
+                <View
+                  style={{
+                    height: 48,
+                    borderRadius: RADIUS.md,
+                    backgroundColor: b.bg,
+                    borderWidth: 2,
+                    borderColor: selected ? theme.primary : theme.outline,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ color: b.fg, fontWeight: '800' }}>Aa</Text>
+                </View>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                  style={{
+                    color: selected ? theme.primary : theme.textMuted,
+                    fontSize: 11,
+                    fontWeight: '700',
+                    textAlign: 'center',
+                  }}
+                >
+                  {b.nameKey ? t(b.nameKey) : b.name}
+                </Text>
               </View>
-              <Text
-                style={{
-                  color: prefs.readerBackground === b.key ? theme.primary : theme.textMuted,
-                  fontSize: 11,
-                  fontWeight: '700',
-                }}
-              >
-                {b.name}
-              </Text>
+            </Ripple>
+          );
+        })}
+      </Surface>
+
+      <SectionLabel>{t('settingsReader.readingMode')}</SectionLabel>
+      <Surface level={1} style={{ padding: 16, marginBottom: 18 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+          <Chip
+            icon="swap-vertical-outline"
+            label={t('settingsReader.modeScroll')}
+            selected={prefs.readingMode !== 'paged'}
+            onPress={() => setPref('readingMode', 'scroll')}
+          />
+          <Chip
+            icon="swap-horizontal-outline"
+            label={t('settingsReader.modePaged')}
+            selected={prefs.readingMode === 'paged'}
+            onPress={() => setPref('readingMode', 'paged')}
+          />
+        </View>
+        <Text style={{ color: theme.textMuted, fontSize: 12.5, marginTop: 4, lineHeight: 18 }}>
+          {prefs.readingMode === 'paged' ? t('settingsReader.modePagedSubtitle') : t('settingsReader.modeScrollSubtitle')}
+        </Text>
+        {prefs.readingMode === 'paged' ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 14 }}>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={{ color: theme.text, fontWeight: '700' }}>{t('settingsReader.pageTurn')}</Text>
+              <Text style={{ color: theme.textMuted, fontSize: 12.5, marginTop: 4, lineHeight: 18 }}>{t('settingsReader.pageTurnSubtitle')}</Text>
             </View>
-          </Ripple>
-        ))}
+            <Switch
+              value={prefs.pageTurnAnimation === true}
+              onValueChange={(v) => setPref('pageTurnAnimation', v)}
+              trackColor={{ false: theme.outline, true: theme.primary }}
+              thumbColor={theme.surface}
+            />
+          </View>
+        ) : null}
       </Surface>
 
       <SectionLabel>{t('settingsReader.typography')}</SectionLabel>

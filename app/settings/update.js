@@ -58,10 +58,7 @@ export default function UpdateScreen() {
 
   const handleDownload = useCallback(async () => {
     setInstallResult(null);
-    const result = await downloadAppUpdate();
-    if (result && !result.completed && result.error) {
-      // Download failed — the error is shown via state
-    }
+    await downloadAppUpdate();
   }, [downloadAppUpdate]);
 
   const handleCancel = useCallback(() => {
@@ -117,7 +114,6 @@ export default function UpdateScreen() {
 
   return (
     <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={{ padding: 16 }}>
-      {/* Current Version */}
       <Surface level={1} style={{ padding: 18, marginBottom: 18 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <View style={{ flex: 1 }}>
@@ -141,7 +137,6 @@ export default function UpdateScreen() {
         </View>
       </Surface>
 
-      {/* Checking */}
       {checking && (
         <Surface level={1} style={{ padding: 22, marginBottom: 18, alignItems: 'center' }}>
           <Ionicons name="sync-outline" size={28} color={theme.primary} style={{ marginBottom: 12 }} />
@@ -151,7 +146,6 @@ export default function UpdateScreen() {
         </Surface>
       )}
 
-      {/* Up To Date */}
       {isUpToDate && (
         <Surface level={1} style={{ padding: 22, marginBottom: 18, alignItems: 'center' }}>
           <View
@@ -179,7 +173,6 @@ export default function UpdateScreen() {
         </Surface>
       )}
 
-      {/* Check / Download Error */}
       {isFailed && !checking && !isDownloading && (
         <Surface level={1} style={{ padding: 22, marginBottom: 18, alignItems: 'center' }}>
           <View
@@ -200,7 +193,7 @@ export default function UpdateScreen() {
           </Text>
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 18 }}>
             <Button
-              label={dlError ? 'update.retry' : 'update.retry'}
+              label="update.retry"
               variant="tonal"
               onPress={dlError ? handleDownload : handleCheck}
             />
@@ -208,7 +201,6 @@ export default function UpdateScreen() {
         </Surface>
       )}
 
-      {/* Update Available */}
       {isUpdateAvailable && release && (
         <Surface level={1} style={{ padding: 20, marginBottom: 18 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
@@ -235,7 +227,6 @@ export default function UpdateScreen() {
             </View>
           </View>
 
-          {/* Release notes */}
           {hasNotes && (
             <View style={{ marginBottom: 18 }}>
               <Text style={{ color: theme.text, fontSize: 14, fontWeight: '700', marginBottom: 10 }}>
@@ -294,14 +285,12 @@ export default function UpdateScreen() {
             </View>
           ) : null}
 
-          {/* APK size */}
           {release.apkSize > 0 && (
             <Text style={{ color: theme.textMuted, fontSize: 12.5, marginBottom: 14 }}>
               {formatBytes(release.apkSize)}
             </Text>
           )}
 
-          {/* Actions */}
           <View style={{ gap: 10 }}>
             <Button label={t('update.downloadUpdate')} onPress={handleDownload} />
             <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -316,7 +305,6 @@ export default function UpdateScreen() {
         </Surface>
       )}
 
-      {/* Downloading */}
       {isDownloading && (
         <Surface level={1} style={{ padding: 22, marginBottom: 18 }}>
           <Text style={{ color: theme.text, fontSize: 16, fontWeight: '700', textAlign: 'center', marginBottom: 4 }}>
@@ -345,7 +333,6 @@ export default function UpdateScreen() {
         </Surface>
       )}
 
-      {/* Ready to Install */}
       {isReadyToInstall && (
         <Surface level={1} style={{ padding: 22, marginBottom: 18 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>

@@ -1,7 +1,9 @@
 import { memo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { encodeNavParam } from '../lib/navIds';
+import { useStore } from '../store/useStore';
+import { useI18n } from '../hooks/useI18n';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { alpha, RADIUS } from '../theme/theme';
 import Ripple from './Ripple';
@@ -10,18 +12,37 @@ import Cover from './Cover';
 const NovelCard = memo(function NovelCard({ novel, width }) {
   const theme = useAppTheme();
   const router = useRouter();
+  const { t } = useI18n();
+  const removeDocument = useStore((s) => s.removeDocument);
+  const isDoc = (novel.kind ?? 'novel') !== 'novel';
   const total = novel.totalChapters || 0;
-  const progress = total ? Math.min(novel.readChapters / total, 1) : 0;
-  const finished = total > 0 && novel.unread === 0;
+  const progress = isDoc ? Math.min(novel.docProgress || 0, 1) : total ? Math.min(novel.readChapters / total, 1) : 0;
+  const finished = isDoc ? progress >= 0.999 : total > 0 && novel.unread === 0;
+
+  const open = () =>
+    router.push(isDoc ? `/document/${encodeNavParam(novel.id)}` : `/novel/${encodeNavParam(novel.id)}`);
+  const confirmRemove = () =>
+    Alert.alert(t('document.removeTitle'), t('document.removeBody', { title: novel.title }), [
+      { text: t('document.cancel'), style: 'cancel' },
+      { text: t('document.remove'), style: 'destructive', onPress: () => removeDocument(novel.id) },
+    ]);
 
   return (
     <View style={{ width, borderRadius: RADIUS.lg, overflow: 'hidden' }}>
-      <Ripple onPress={() => router.push(`/novel/${encodeNavParam(novel.id)}`)}>
+      <Ripple onPress={open} onLongPress={isDoc ? confirmRemove : undefined}>
         <View>
           <View style={styles.coverWrap}>
             <Cover uri={novel.cover} title={novel.title} radius={RADIUS.lg} style={styles.cover} />
 
-            {novel.unread > 0 ? (
+            {isDoc ? (
+              <View style={[styles.kind, { backgroundColor: '#000000b3' }]}>
+                <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 }}>
+                  {novel.kind === 'pdf' ? 'PDF' : 'EPUB'}
+                </Text>
+              </View>
+            ) : null}
+
+            {!isDoc && novel.unread > 0 ? (
               <View style={[styles.badge, { backgroundColor: theme.primary }]}>
                 <Text style={{ color: theme.onPrimary, fontSize: 11, fontWeight: '800' }}>
                   {novel.unread > 99 ? '99+' : novel.unread}
@@ -45,7 +66,12 @@ const NovelCard = memo(function NovelCard({ novel, width }) {
           <Text numberOfLines={2} style={[styles.title, { color: theme.text }]}>
             {novel.title}
           </Text>
-          {total > 0 ? (
+          {isDoc ? (
+            <Text numberOfLines={1} style={[styles.meta, { color: theme.textMuted }]}>
+              {novel.author ? `${novel.author} · ` : ''}
+              {Math.round(progress * 100)}%
+            </Text>
+          ) : total > 0 ? (
             <Text numberOfLines={1} style={[styles.meta, { color: theme.textMuted }]}>
               {novel.readChapters}/{total} read
             </Text>
@@ -70,6 +96,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  kind: { position: 'absolute', top: 7, left: 7, paddingHorizontal: 6, height: 18, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   badgeIcon: { minWidth: 22, paddingHorizontal: 0 },
   progressWrap: { position: 'absolute', left: 8, right: 8, bottom: 8 },
   progressTrack: { height: 4, borderRadius: 4, overflow: 'hidden' },

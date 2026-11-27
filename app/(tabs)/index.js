@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, RefreshControl, useWindowDimensions, View } from 'react-native';
+import { Alert, FlatList, RefreshControl, useWindowDimensions, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from '../../store/useStore';
@@ -8,6 +8,8 @@ import { useI18n } from '../../hooks/useI18n';
 import NovelCard from '../../components/NovelCard';
 import ContinueReading from '../../components/ContinueReading';
 import { Button, EmptyState, Field, IconButton, ScreenHeader } from '../../components/MD3';
+import { pickAndImport } from '../../lib/documents';
+import { showToast } from '../../lib/toast';
 
 const GAP = 12;
 const PADDING = 16;
@@ -27,6 +29,7 @@ export default function LibraryScreen() {
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -61,6 +64,27 @@ export default function LibraryScreen() {
     [cardWidth],
   );
 
+  const onImport = useCallback(async () => {
+    if (importing) return;
+    setImporting(true);
+    try {
+      const { imported, failed, canceled } = await pickAndImport();
+      if (canceled) return;
+      await refreshLibrary();
+      if (imported.length) showToast(t('document.imported', { count: imported.length }));
+      if (failed.length) {
+        Alert.alert(
+          t('document.importFailedTitle'),
+          failed.map((f) => `• ${f.name}: ${t(`document.err.${f.code}`)}`).join('\n'),
+        );
+      }
+    } catch {
+      Alert.alert(t('document.importFailedTitle'), t('document.err.storage'));
+    } finally {
+      setImporting(false);
+    }
+  }, [importing, refreshLibrary, t]);
+
   const toggleSearch = useCallback(() => {
     setSearchOpen((open) => {
       if (open) setQuery('');
@@ -84,6 +108,13 @@ export default function LibraryScreen() {
               color={theme.text}
               onPress={toggleSearch}
               accessibilityLabel={t('library.searchA11y')}
+            />
+            <IconButton
+              icon="document-attach-outline"
+              color={theme.text}
+              disabled={importing}
+              onPress={onImport}
+              accessibilityLabel={t('document.import')}
             />
             <IconButton
               icon="grid-outline"
@@ -130,7 +161,12 @@ export default function LibraryScreen() {
                 : t('library.empty.subtitle')
             }
             action={
-              library.length ? null : <Button label={t('library.findNovels')} onPress={() => router.push('/(tabs)/catalogs')} />
+              library.length ? null : (
+                <View style={{ gap: 10 }}>
+                  <Button label={t('library.findNovels')} onPress={() => router.push('/(tabs)/catalogs')} />
+                  <Button variant="tonal" label={t('document.import')} onPress={onImport} />
+                </View>
+              )
             }
           />
         }

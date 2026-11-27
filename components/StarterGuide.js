@@ -7,7 +7,8 @@ import { useAppTheme } from '../hooks/useAppTheme';
 import { useI18n } from '../hooks/useI18n';
 import { Button, Field } from './MD3';
 import Ripple from './Ripple';
-import { alpha, RADIUS, THEMES } from '../theme/theme';
+import { alpha, RADIUS, THEMES, themeName } from '../theme/theme';
+import { APPEARANCES, APPEARANCE_KEYS } from '../theme/palette';
 import { pickBackupFolder, getBackupFolderUri, BackupError } from '../lib/backup';
 import { getPermissionInfo, requestPermission, openNotificationSettings } from '../lib/notifications';
 import { isExpoGo } from '../lib/nativeSupport';
@@ -45,9 +46,7 @@ export default function StarterGuide() {
 
   const [step, setStep] = useState(0);
 
-  // Any step-completed/finished path funnels through here so the separate, older
-  // notification-permission prompt never redundantly re-asks right after this guide
-  // already covered the same ground.
+  // Finish also marks the notification prompt seen so it won't re-ask right after the guide.
   const finish = useCallback(async () => {
     await setPref('notificationPromptSeen', true);
     await completeStarterGuide();
@@ -69,7 +68,6 @@ export default function StarterGuide() {
   return (
     <Modal visible animationType="slide" onRequestClose={goBack} statusBarTranslucent>
       <View style={{ flex: 1, backgroundColor: theme.background, paddingTop: insets.top, paddingBottom: insets.bottom }}>
-        {/* Header: progress + skip */}
         <View
           style={{
             flexDirection: rtl ? 'row-reverse' : 'row',
@@ -90,7 +88,6 @@ export default function StarterGuide() {
           )}
         </View>
 
-        {/* Progress dots */}
         <View style={{ flexDirection: rtl ? 'row-reverse' : 'row', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
           {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
             <View
@@ -121,7 +118,6 @@ export default function StarterGuide() {
           />
         </ScrollView>
 
-        {/* Footer nav */}
         <View
           style={{
             flexDirection: rtl ? 'row-reverse' : 'row',
@@ -352,6 +348,30 @@ function ThemeStep({ theme, t, prefs, setPref }) {
       <StepIcon name="color-palette-outline" theme={theme} />
       <Title theme={theme}>{t('starterGuide.theme.title')}</Title>
       <Body theme={theme}>{t('starterGuide.theme.body')}</Body>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 14 }}>
+        {APPEARANCE_KEYS.map((key) => {
+          const mode = APPEARANCES[key];
+          const selected = key === prefs.appearance;
+          return (
+            <Ripple key={key} onPress={() => setPref('appearance', key)}>
+              <View
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  borderRadius: RADIUS.pill,
+                  borderWidth: 2,
+                  borderColor: selected ? theme.primary : alpha(theme.outline, 0.7),
+                  backgroundColor: selected ? alpha(theme.primary, 0.12) : 'transparent',
+                }}
+              >
+                <Text style={{ color: selected ? theme.primary : theme.textMuted, fontSize: 12, fontWeight: '700' }}>
+                  {t(mode.nameKey)}
+                </Text>
+              </View>
+            </Ripple>
+          );
+        })}
+      </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
         {Object.values(THEMES).map((th) => {
           const selected = th.key === prefs.theme;
@@ -383,7 +403,7 @@ function ThemeStep({ theme, t, prefs, setPref }) {
                   {selected ? <Ionicons name="checkmark" size={16} color={th.onPrimary} /> : null}
                 </View>
                 <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: 10.5, fontWeight: '600' }}>
-                  {th.name}
+                  {themeName(t, th)}
                 </Text>
               </View>
             </Ripple>

@@ -48,7 +48,6 @@ check('strips back-to-back doubled undefined artifacts', () => {
   assert.equal(stripStrayUndefined(input), expected);
 });
 
-// Empty/nullish input should never throw.
 check('handles empty and nullish input safely', () => {
   assert.equal(stripStrayUndefined(''), '');
   assert.equal(stripStrayUndefined(undefined), '');

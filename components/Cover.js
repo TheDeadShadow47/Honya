@@ -6,8 +6,8 @@ import { RADIUS } from '../theme/theme';
 /** `fadeDuration={0}` avoids the default Android cross-fade, a big source of jank when cells recycle. */
 const Cover = memo(function Cover({ uri, width, height, radius = RADIUS.md, title, style }) {
   const theme = useAppTheme();
-  const [failed, setFailed] = useState(false);
-  const showImage = !!uri && !failed;
+  const [failedUri, setFailedUri] = useState(null); // keyed by URI so a regenerated or replaced cover gets a fresh try
+  const showImage = !!uri && failedUri !== uri;
 
   return (
     <View
@@ -22,7 +22,7 @@ const Cover = memo(function Cover({ uri, width, height, radius = RADIUS.md, titl
           style={StyleSheet.absoluteFill}
           resizeMode="cover"
           fadeDuration={0}
-          onError={() => setFailed(true)}
+          onError={() => setFailedUri(uri)}
         />
       ) : (
         <View style={styles.fallback}>
